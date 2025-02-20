@@ -53,7 +53,7 @@ class GoalPoseSubscriber(Node):
     def save_goals_to_yaml(self):
         data = {'waypoints': self.goals}
         
-        with open(self.filename, 'w') as file:
+        with open('src/go2_waypoint_nav/navigation_path/' + self.filename, 'w') as file:
             yaml.dump(data, file ,default_flow_style=False)
         
         self.get_logger().info(f"Goals saved to {self.filename}")
@@ -64,7 +64,7 @@ def main(args=None):
 
 
     filename = input("Enter the name of .yaml file: ")
-    if not filter.endswith('.yaml'):
+    if not filename.endswith('.yaml'):
         filename += '.yaml'
 
 
