@@ -76,14 +76,14 @@ def main(args=None):
     num_points = int(input('Enter number of goal points: '))
 
 
-    minimal_subscriber = GoalPoseSubscriber(filename, num_points)
+    goal_pose_subscriber = GoalPoseSubscriber(filename, num_points)
 
     try:
-        rclpy.spin(minimal_subscriber)
+        rclpy.spin(goal_pose_subscriber)
     except KeyboardInterrupt:
-        minimal_subscriber.get_logger().info("Shutting down.")
+        goal_pose_subscriber.get_logger().info("Shutting down.")
     finally:
-        minimal_subscriber.destroy_node()
+        goal_pose_subscriber.destroy_node()
         rclpy.shutdown()
 
 
