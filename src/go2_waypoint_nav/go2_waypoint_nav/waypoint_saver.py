@@ -2,6 +2,8 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 import yaml
+import json
+import sys
 
 class GoalPoseSubscriber(Node):
 
@@ -41,7 +43,8 @@ class GoalPoseSubscriber(Node):
 
         # add goal to the list
         self.goals.append(goal_data)
-        self.get_logger().info(goal_data)
+
+        self.get_logger().info("I heard: \n" + json.dumps(goal_data, indent=2))
 
 
         if len(self.goals)  == self.num_points:
@@ -57,6 +60,8 @@ class GoalPoseSubscriber(Node):
             yaml.dump(data, file ,default_flow_style=False)
         
         self.get_logger().info(f"Goals saved to {self.filename}")
+        self.destroy_node()
+        rclpy.shutdown()
 
 
 def main(args=None):
@@ -73,13 +78,13 @@ def main(args=None):
 
     minimal_subscriber = GoalPoseSubscriber(filename, num_points)
 
-    rclpy.spin(minimal_subscriber)
-
-    # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
-    minimal_subscriber.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(minimal_subscriber)
+    except KeyboardInterrupt:
+        minimal_subscriber.get_logger().info("Shutting down.")
+    finally:
+        minimal_subscriber.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':
