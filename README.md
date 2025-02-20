@@ -7,7 +7,7 @@
    git clone https://github.com/gholibqasobov/go2_autonomous_inspection.git
    ```
 
-2. **Navigate to the project directory **:
+2. **Navigate to the project directory**:
    ```bash
    cd go2_autonomous_inspection
    
