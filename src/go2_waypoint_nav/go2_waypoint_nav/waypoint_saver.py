@@ -62,13 +62,15 @@ class GoalPoseSubscriber(Node):
         self.get_logger().info(f"Goals saved to {self.filename}")
         self.destroy_node()
         rclpy.shutdown()
+        sys.exit(0)
 
 
 def main(args=None):
     rclpy.init(args=args)
 
 
-    filename = input("Enter the name of .yaml file: ")
+    # filename = input("Enter the name of .yaml file: ")
+    filename = 'test_waypoint'
     if not filename.endswith('.yaml'):
         filename += '.yaml'
 
