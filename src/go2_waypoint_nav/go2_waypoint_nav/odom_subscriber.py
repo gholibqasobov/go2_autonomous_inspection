@@ -18,7 +18,10 @@ class OdomSubscriber(Node):
         self.subscription  # prevent unused variable warning
 
     def listener_callback(self, msg):
-        self.get_logger().info('I heard: "%s"' % msg.data)
+        position = msg.pose.pose.position
+        orientation = msg.pose.pose.orientation
+
+        self.get_logger().info(f'I heard: \n position: {position} \n orientation: {orientation}')
 
 
 def main(args=None):
