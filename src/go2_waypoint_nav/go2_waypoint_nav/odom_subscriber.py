@@ -19,9 +19,9 @@ class OdomSubscriber(Node):
 
     def listener_callback(self, msg):
         position = msg.pose.pose.position
-        orientation = msg.pose.pose.orientation
+        # orientation = msg.pose.pose.orientation
 
-        self.get_logger().info(f'I heard: \n position: {position} \n orientation: {orientation}')
+        self.get_logger().info(f'I heard: x: {position.x}, y:{position.y}, z:{position.z}\n\n')
 
 
 def main(args=None):
