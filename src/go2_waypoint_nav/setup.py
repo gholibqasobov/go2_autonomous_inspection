@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
             'go2_waypoint_follower = go2_waypoint_nav.waypoint_follower:main',
             'go2_waypoint_saver = go2_waypoint_nav.waypoint_saver:main',
+            'go2_waypoint_follower_odom = go2_waypoint_nav.waypoint_follower_odom:main',
         ],
     },
 )

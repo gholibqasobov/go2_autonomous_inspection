@@ -51,7 +51,7 @@ class GoalPosePublisher(Node):
             if self.goal_index < len(self.goals):
                 # Wait for 1 seconds before publishing the next goal
                 self.create_timer(1.0, self.publish_next_goal)
-                # time.sleep(7)
+                time.sleep(15)
             else:
                 self.get_logger().info("All goal points have been reached. Shutting down...")
                 self.destroy_node()
