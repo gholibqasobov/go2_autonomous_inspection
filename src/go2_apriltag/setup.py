@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'my_node = go2_apriltag.my_node:main'
+            'my_node = go2_apriltag.move_robot:main'
         ],
     },
 )
