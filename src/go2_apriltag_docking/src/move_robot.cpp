@@ -7,7 +7,6 @@
 #include <thread>
 
 #include "rclcpp/rclcpp.hpp"
-#include <sensor_msgs/msg/imu.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 
 // For real robot
@@ -24,7 +23,7 @@ class DockingCmdVelPublisher : public rclcpp::Node
     : Node("docking_cmd_vel_publisher")
     {
     //   publisher_ = this->create_publisher<std_msgs::msg::String>("topic", 10);
-        autonomy_mode_pub_ = this->create_publisher<std_msgs::msg::Bool>("/autonomy_mode", 10);
+        cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>("/cmd_vel", 10);
         go2_request_pub_ = this->create_publisher<unitree_api::msg::Request>("/api/sport/request", 10);
 
         moveForward();
@@ -47,7 +46,7 @@ class DockingCmdVelPublisher : public rclcpp::Node
         cmd_vel.twist.linear.y = 0.0;
         cmd_vel.twist.angular.z = 0.0;
 
-        RCLCPP_INFO(this->get_logger(), "Moving Forward for 3 seconds...");
+        RCLCPP_INFO(this->get_logger(), "Moving Forward for 7 seconds...");
         cmd_vel_pub_->publish(cmd_vel);
 
         
@@ -57,7 +56,7 @@ class DockingCmdVelPublisher : public rclcpp::Node
         sport_req.Move(req, cmd_vel.twist.linear.x, cmd_vel.twist.linear.y, cmd_vel.twist.angular.z);
         go2_request_pub_->publish(req);
 
-        std::this_thread::sleep_for(std::chrono::seconds(3)); // Move for 3 seconds
+        std::this_thread::sleep_for(std::chrono::seconds(7)); // Move for 3 seconds
     }
 
     void stopRobot() {
@@ -87,8 +86,7 @@ class DockingCmdVelPublisher : public rclcpp::Node
 int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
-  auto node = rclcpp::spin(std::make_shared<DockingCmdVelPublisher>());
-  rclcpp::spin(node);
+  rclcpp::spin(std::make_shared<DockingCmdVelPublisher>());
   rclcpp::shutdown();
   return 0;
 }
