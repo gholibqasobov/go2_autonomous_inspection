@@ -5,7 +5,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-include_directories(/home/qasob/autonomy_stack_go2/src/utilities/calibrate_imu/include)
+include_directories(/home/$ENV{USER}/autonomy_stack_go2/src/utilities/calibrate_imu/include)
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
