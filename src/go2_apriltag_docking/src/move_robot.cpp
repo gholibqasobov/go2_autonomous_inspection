@@ -1,4 +1,3 @@
-#include <iostream>
 #include <chrono>
 #include <functional>
 #include <memory>
@@ -13,80 +12,77 @@
 #include "unitree_api/msg/request.hpp"
 #include "common/ros2_sport_client.h"
 
-
-
+using namespace std::chrono_literals;
 
 class DockingCmdVelPublisher : public rclcpp::Node
 {
-  public:
+public:
     DockingCmdVelPublisher()
-    : Node("docking_cmd_vel_publisher")
+        : Node("docking_cmd_vel_publisher"), move_duration_(5s)
     {
-    //   publisher_ = this->create_publisher<std_msgs::msg::String>("topic", 10);
         cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>("/cmd_vel", 10);
         go2_request_pub_ = this->create_publisher<unitree_api::msg::Request>("/api/sport/request", 10);
 
-        moveForward();
-        stopRobot();
-    
+        start_time_ = this->now();
+        timer_ = this->create_wall_timer(100ms, std::bind(&DockingCmdVelPublisher::moveForward, this));
     }
 
-  private:
+private:
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr cmd_vel_pub_;
     rclcpp::Publisher<unitree_api::msg::Request>::SharedPtr go2_request_pub_;
+    rclcpp::TimerBase::SharedPtr timer_;
+    rclcpp::Time start_time_;
+    std::chrono::seconds move_duration_;
 
+    void moveForward()
+    {
+        if ((this->now() - start_time_).seconds() >= move_duration_.count())
+        {
+            stopRobot();
+            return;
+        }
 
-
-    void moveForward() {
         geometry_msgs::msg::TwistStamped cmd_vel;
         cmd_vel.header.stamp = this->now();
         cmd_vel.header.frame_id = "vehicle";
-
-        cmd_vel.twist.linear.x = 0.2; 
+        cmd_vel.twist.linear.x = 1.0;
         cmd_vel.twist.linear.y = 0.0;
         cmd_vel.twist.angular.z = 0.0;
 
-        RCLCPP_INFO(this->get_logger(), "Moving Forward for 7 seconds...");
+        RCLCPP_INFO(this->get_logger(), "Moving Forward...");
         cmd_vel_pub_->publish(cmd_vel);
 
-        
         // If using Unitree API, send direct movement request
         unitree_api::msg::Request req;
         SportClient sport_req;
         sport_req.Move(req, cmd_vel.twist.linear.x, cmd_vel.twist.linear.y, cmd_vel.twist.angular.z);
         go2_request_pub_->publish(req);
-
-        std::this_thread::sleep_for(std::chrono::seconds(7)); // Move for 3 seconds
     }
 
-    void stopRobot() {
+    void stopRobot()
+    {
+        RCLCPP_INFO(this->get_logger(), "Stopping Robot...");
+        timer_->cancel();
+
         geometry_msgs::msg::TwistStamped cmd_vel;
         cmd_vel.header.stamp = this->now();
         cmd_vel.header.frame_id = "vehicle";
-
-        // Stop the robot
         cmd_vel.twist.linear.x = 0.0;
         cmd_vel.twist.linear.y = 0.0;
         cmd_vel.twist.angular.z = 0.0;
-
-        RCLCPP_INFO(this->get_logger(), "Stopping Robot...");
         cmd_vel_pub_->publish(cmd_vel);
 
-        // If using Unitree API, stop robot
         unitree_api::msg::Request req;
         SportClient sport_req;
         sport_req.StopMove(req);
         go2_request_pub_->publish(req);
     }
-
 };
 
-
-
-int main(int argc, char * argv[])
+int main(int argc, char *argv[])
 {
-  rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<DockingCmdVelPublisher>());
-  rclcpp::shutdown();
-  return 0;
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<DockingCmdVelPublisher>());
+    rclcpp::shutdown();
+    return 0;
 }
