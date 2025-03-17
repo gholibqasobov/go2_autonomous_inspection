@@ -12,6 +12,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 set(unitree_api_DIR "/home/$USER/autonomy_stack_go2/install/unitree_api")
 find_package(unitree_api REQUIRED)
@@ -22,9 +23,12 @@ find_package(go2_sport_api REQUIRED)
 add_executable(talker src/move_robot.cpp)
 ament_target_dependencies(talker rclcpp std_msgs geometry_msgs unitree_api go2_sport_api)
 
+add_executable(apriltag_docking src/apriltag_docking.cpp)
+ament_target_dependencies(apriltag_docking rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs)
 
 install(TARGETS
   talker
+  apriltag_docking
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
