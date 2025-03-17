@@ -24,7 +24,7 @@ public:
         go2_request_pub_ = this->create_publisher<unitree_api::msg::Request>("/api/sport/request", 10);
 
         start_time_ = this->now();
-        timer_ = this->create_wall_timer(100ms, std::bind(&DockingCmdVelPublisher::moveForward, this));
+        timer_ = this->create_wall_timer(0ms, std::bind(&DockingCmdVelPublisher::moveForward, this));
     }
 
 private:
