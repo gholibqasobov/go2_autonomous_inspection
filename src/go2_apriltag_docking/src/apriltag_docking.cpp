@@ -9,7 +9,7 @@ goal pose
 approach by turning
 
 it's better to start from joy publisher -- done
-apriltag_subscriber -- 
+apriltag_subscriber -- done (in a separate script)
 
 */ 
 
