@@ -35,3 +35,16 @@ ros2 run go2_waypoint_nav go2_waypoint_follower
 
 This will navigate the robot to the saved goal points.
 
+### Using move_robot function
+
+In .bashrc file add
+```bash
+source ~/autonomy_stack_go2/install/setup.bash
+source ~/go2_autonomous_inspection/install/setup.bash
+```
+and source the .bashrc file
+
+Run the following command
+```bash
+ros2 run go2_apriltag_docking talker
+```
