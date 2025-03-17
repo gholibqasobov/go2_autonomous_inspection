@@ -34,6 +34,7 @@ ament_target_dependencies(apriltag_pose_sub rclcpp std_msgs geometry_msgs unitre
 install(TARGETS
   talker
   apriltag_docking
+  apriltag_pose_sub
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
