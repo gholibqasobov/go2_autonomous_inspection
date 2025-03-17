@@ -8,7 +8,8 @@ algorithm
 goal pose
 approach by turning
 
-it's better to start from joy publisher
+it's better to start from joy publisher -- done
+apriltag_subscriber -- 
 
 */ 
 
@@ -47,7 +48,7 @@ class DockingCmdVelPublisher : public rclcpp::Node
         message.header.frame_id = "teleop_panel";
 
 
-        message.axes = {0.0, 0.0, 1.0, 0.5, 0.5, 1.0, 0.0, 0.0}; // indices 3, 4
+        message.axes = {0.0, 0.0, 1.0, 0.0, 0.5, 1.0, 0.0, 0.0}; // indices angular.z: 3, linear.x: 4
         message.buttons = {0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0};
         
         
