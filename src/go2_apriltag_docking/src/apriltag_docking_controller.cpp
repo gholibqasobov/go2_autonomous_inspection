@@ -23,10 +23,13 @@ add angular docking controller
 #include <functional>
 #include <memory>
 #include <string>
+#include <cmath>
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "tf2_msgs/msg/tf_message.hpp"
+#include "tf2/LinearMath/Quaternion.h"
+#include "tf2/LinearMath/Matrix3x3.h"
 
 using namespace std::chrono_literals;
 using std::placeholders::_1;
@@ -91,7 +94,7 @@ class AprilTagDockingController : public rclcpp::Node
 
 
       RCLCPP_INFO(this->get_logger(), "Error: %f", x_error_);
-      v_x = std::clamp(v_x, -0.5, 0.5);
+      v_x = std::clamp(v_x, 0.0, 0.5);
       omega_z = std::clamp(omega_z, -1.0, 1.0);
 
       if (!apriltag_detected_)

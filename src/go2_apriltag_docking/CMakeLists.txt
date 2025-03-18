@@ -14,6 +14,7 @@ find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2_msgs REQUIRED)
+find_package(tf2 REQUIRED)
 
 
 set(unitree_api_DIR "/home/$USER/autonomy_stack_go2/install/unitree_api")
@@ -32,7 +33,7 @@ add_executable(apriltag_pose_sub src/apriltag_tf_subscriber.cpp)
 ament_target_dependencies(apriltag_pose_sub rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs)
 
 add_executable(apriltag_docking_controller src/apriltag_docking_controller.cpp)
-ament_target_dependencies(apriltag_docking_controller rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs)
+ament_target_dependencies(apriltag_docking_controller rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs tf2)
 
 install(TARGETS
   talker
