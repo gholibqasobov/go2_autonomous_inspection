@@ -55,7 +55,7 @@ class AprilTagDockingController : public rclcpp::Node
         message.header.frame_id = "teleop_panel";
 
 
-        message.axes = {0.0, 0.0, 1.0, 0.0, 0.5, 1.0, 0.0, 0.0}; // indices angular.z: 3, linear.x: 4
+        message.axes = {0.0, 0.0, 1.0, 0.0, 0.5, 1.0, 0.0, 0.0}; // indices: angular.z: 3, linear.x: 4
         message.buttons = {0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0};
         
         
@@ -95,5 +95,4 @@ int main(int argc, char * argv[])
   return 0;
 }
 
-
-// hello world
+// some additional comment
