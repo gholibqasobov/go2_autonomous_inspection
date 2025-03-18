@@ -142,6 +142,18 @@ class AprilTagDockingController : public rclcpp::Node
                 apriltag_detected_ = true;
 
                 x_error_ = transform.transform.translation.z; // Forward distance
+                y_error_ = transform.transform.translation.x;
+                // Convert quaternion to Euler angles
+                tf2::Quaternion q(
+                    transform.transform.rotation.x,
+                    transform.transform.rotation.y,
+                    transform.transform.rotation.z,
+                    transform.transform.rotation.w);
+                tf2::Matrix3x3 m(q);
+                double roll, pitch, yaw;
+                m.getRPY(roll, pitch, yaw);
+
+                theta_error_ = pitch; // Orientation misalignment y direction
 
 
                 // RCLCPP_INFO(this->get_logger(), "Received transform for frame: %s", transform.child_frame_id.c_str());
