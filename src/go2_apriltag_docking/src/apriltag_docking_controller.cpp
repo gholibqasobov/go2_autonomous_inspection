@@ -44,33 +44,48 @@ class AprilTagDockingController : public rclcpp::Node
     // Docking control variables
     bool apriltag_detected_ = false;
     double x_error_ = 0.0;
+    double y_error_ = 0.0;
+    double theta_error_ = 0.0;
 
     rclcpp::Time last_detection_time_;
     double detection_timeout_ = 0.5; 
 
     // Control gains
-    double k_x_ = 1.0;
+    double k_x_ = 0.0;
+    double k_y_ = 1.0;
+    double k_theta_ = 1.0;
     
     // Docking thresholds
     double min_x_threshold_ = 0.25; // Stop when within 25cm
+    double min_y_threshold_ = 0.05;
+    double min_theta_threshold_ = 0.02;
 
     void publish_cmd_vel()
     {
       double v_x = 0.0;
+      double v_y = 0.0;
+      double v_theta = 0.0;
+      
       const auto elapsed = (this->now() - last_detection_time_).seconds();
       apriltag_detected_ = (elapsed < detection_timeout_);
       
       if (apriltag_detected_){
         // Computing control velocities
         v_x = k_x_ * x_error_;
+        v_y = k_y_ * y_error_;
+        v_theta = k_theta_ * theta_error_;
 
         RCLCPP_INFO(this->get_logger(), "Error: %f", x_error_);
         v_x = std::clamp(v_x, 0.0, 0.3);
+        v_y = std::clamp(v_y, 0.0, 0.3);
+        v_theta = std::clamp(v_theta, 0.0, 0.5);
 
         // Stop robot when docking is reached
-        if (std::abs(x_error_) <= min_x_threshold_)
+        if (std::abs(x_error_) <= min_x_threshold_ && std::abs(y_error_) <= min_y_threshold_ && std::abs(theta_error_) <= min_theta_threshold_)
         {
           v_x = 0.0;
+          v_y = 0.0;
+          v_theta = 0.0;
           RCLCPP_INFO(this->get_logger(), "Docking Complete! Stopping the robot.");
         }
 
@@ -105,10 +120,22 @@ class AprilTagDockingController : public rclcpp::Node
                 // apriltag_detected_ = true;
 
                 x_error_ = transform.transform.translation.z; // Forward distance
+                y_error_ = transform.transform.translation.x;
+                // Convert quaternion to Euler angles
+                tf2::Quaternion q(
+                    transform.transform.rotation.x,
+                    transform.transform.rotation.y,
+                    transform.transform.rotation.z,
+                    transform.transform.rotation.w);
+                tf2::Matrix3x3 m(q);
+                double roll, pitch, yaw;
+                m.getRPY(roll, pitch, yaw);
 
-                RCLCPP_INFO(this->get_logger(),
-                            "AprilTag Pose -> x: %.2f",
-                            x_error_);
+                theta_error_ = pitch; // Orientation misalignment y direction
+
+                //RCLCPP_INFO(this->get_logger(),
+                 //           "AprilTag Pose -> x: %.2f",
+                  //          x_error_);
             }
 
 
