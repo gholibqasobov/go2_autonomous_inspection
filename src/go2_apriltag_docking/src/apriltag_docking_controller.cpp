@@ -65,7 +65,7 @@ class AprilTagDockingController : public rclcpp::Node
         v_x = k_x_ * x_error_;
 
         RCLCPP_INFO(this->get_logger(), "Error: %f", x_error_);
-        v_x = std::clamp(v_x, 0.0, 1.0);
+        v_x = std::clamp(v_x, 0.0, 0.3);
 
         // Stop robot when docking is reached
         if (std::abs(x_error_) <= min_x_threshold_)
