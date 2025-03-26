@@ -63,8 +63,8 @@ class AprilTagDockingController : public rclcpp::Node
     void publish_cmd_vel()
     {
       double v_x = 0.0;
-      double v_y = 0.0;
-      double v_theta = 0.0;
+      double omega_z = 0.0;
+      
       
       const auto elapsed = (this->now() - last_detection_time_).seconds();
       apriltag_detected_ = (elapsed < detection_timeout_);
@@ -72,20 +72,18 @@ class AprilTagDockingController : public rclcpp::Node
       if (apriltag_detected_){
         // Computing control velocities
         v_x = k_x_ * x_error_;
-        v_y = k_y_ * y_error_;
-        v_theta = k_theta_ * theta_error_;
+        omega_z = (k_y_ * y_error_) + (k_theta_ * theta_error_);
 
         RCLCPP_INFO(this->get_logger(), "Error: %f", x_error_);
         v_x = std::clamp(v_x, 0.0, 0.3);
-        v_y = std::clamp(v_y, 0.0, 0.3);
-        v_theta = std::clamp(v_theta, 0.0, 0.5);
+        omega_z = std::clamp(v_y, 0.0, 0.3);
+        
 
         // Stop robot when docking is reached
         if (std::abs(x_error_) <= min_x_threshold_ && std::abs(y_error_) <= min_y_threshold_ && std::abs(theta_error_) <= min_theta_threshold_)
         {
           v_x = 0.0;
-          v_y = 0.0;
-          v_theta = 0.0;
+          omega_z = 0.0;
           RCLCPP_INFO(this->get_logger(), "Docking Complete! Stopping the robot.");
         }
 
@@ -93,13 +91,14 @@ class AprilTagDockingController : public rclcpp::Node
       } else {
         RCLCPP_WARN(this->get_logger(), "AprilTag not detected. Robot will not move.");
           v_x = 0.0;
+          omega_z = 0.0;
       }
 
       auto message = sensor_msgs::msg::Joy();
       message.header.stamp = this->get_clock()->now();
       message.header.frame_id = "teleop_panel";
 
-      message.axes = {0.0, 0.0, 1.0, 0.0, float(v_x), 1.0, 0.0, 0.0}; // indices: angular.z: 3, linear.x: 4
+      message.axes = {0.0, 0.0, 1.0, float(omega_z), float(v_x), 1.0, 0.0, 0.0}; // indices: angular.z: 3, linear.x: 4
       message.buttons = {0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0};
       
       
