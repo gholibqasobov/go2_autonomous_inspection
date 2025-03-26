@@ -51,14 +51,14 @@ class AprilTagDockingController : public rclcpp::Node
     double detection_timeout_ = 0.5; 
 
     // Control gains
-    double k_x_ = 0.0;
-    double k_y_ = 1.0;
-    double k_theta_ = 1.0;
+    double k_x_ = 0.2;
+    double k_y_ = 0.3;
+    double k_theta_ = 0.3;
     
     // Docking thresholds
     double min_x_threshold_ = 0.25; // Stop when within 25cm
-    double min_y_threshold_ = 0.05;
-    double min_theta_threshold_ = 0.02;
+    double min_y_threshold_ = 0.08;
+    double min_theta_threshold_ = 0.03;
 
     void publish_cmd_vel()
     {
@@ -102,7 +102,7 @@ class AprilTagDockingController : public rclcpp::Node
       message.buttons = {0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0};
       
       
-      RCLCPP_INFO(this->get_logger(), "Publishing Joy message \n Forward: %f, Rotation: %f", message.axes[3], message.axes[4]);
+      RCLCPP_INFO(this->get_logger(), "Publishing Joy message \n Forward: %f, Rotation: %f", v_x, omega_z);
       publisher_->publish(message);
 
 
