@@ -48,3 +48,8 @@ Run the following command
 ```bash
 ros2 run go2_apriltag_docking talker
 ```
+
+In order to run the AprilTag Docking Mode
+```bash
+ros2 run go2_apriltag_docking apriltag_docking_controller
+```
