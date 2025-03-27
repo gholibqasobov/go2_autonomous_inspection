@@ -20,10 +20,10 @@ class RoarmElevatorController(Node):
         )
 
         # Robot Move Point Client
-        # self.client = self.create_client(MovePointCmd, 'move_point_cmd')
+        self.client = self.create_client(MovePointCmd, 'move_point_cmd')
 
-        # while not self.client.wait_for_service(timeout_sec=5.0):
-            # self.get_logger().info('Service not available, waiting again...')
+        while not self.client.wait_for_service(timeout_sec=5.0):
+            self.get_logger().info('Service not available, waiting again...')
 
     def apriltag_pose_callback(self, msg):
         for transform in msg.transforms:
@@ -43,15 +43,15 @@ class RoarmElevatorController(Node):
     def get_apriltag_coord(self):
         return self.apriltag_coord
            
-    # def roarm_move_point_request(self, x, y, z):
-    #     request = MovePointCmd.Request()
-    #     request.x = x
-    #     request.y = y
-    #     request.z = z
+    def roarm_move_point_request(self, x, y, z):
+        request = MovePointCmd.Request()
+        request.x = x
+        request.y = y
+        request.z = z
 
-    #     future = self.client.call_async(request)
-    #     rclpy.spin_until_future_complete(self, future)
-    #     return future.result()
+        future = self.client.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+        return future.result()
     
 
 import time 
@@ -60,7 +60,7 @@ def main(args=None):
     rclpy.init(args=args)
 
     node = RoarmElevatorController()
-    time.sleep(1)
+    time.sleep(3)
     
     rclpy.spin_once(node, timeout_sec=0.5)
     apriltag_coord = node.get_apriltag_coord()
@@ -71,25 +71,26 @@ def main(args=None):
     # print(apriltag_coord)
     
 
-    # robot_to_camera_coord = np.array([0.15, 0.02, 0.03]) # in meters
+    robot_to_camera_coord = np.array([0.195, 0.055, 0.01]) # in meters
     
-    # robot_to_camera_rot_mtx = np.array([
-    #     [1, 0, 0],
-    #     [0, 1, 0],
-    #     [0, 0, 1]
-    # ])
+    robot_to_camera_rot_mtx = np.array([
+        [0, 0, 1],
+        [0, -1, 0],
+        [1, 0, 0]
+    ])
     
-    # robot_to_camera_coord = robot_to_camera_coord + np.dot(robot_to_camera_rot_mtx, apriltag_coord)
+    robot_to_camera_coord = robot_to_camera_coord + np.dot(robot_to_camera_rot_mtx, apriltag_coord)
 
-    # x, y, z = robot_to_camera_coord
+    x, y, z = robot_to_camera_coord
+    x -= 0.3
     
-    # response = node.send_request(x, y, z)
+    response = node.roarm_move_point_request(x, y, z)
 
 
-    # if response.success:
-        # node.get_logger().info(f'Success: {response.message}')
-    # else:
-        # node.get_logger().warn(f'Failed: {response.message}')
+    if response.success:
+        node.get_logger().info(f'Success: {response.message}')
+    else:
+        node.get_logger().warn(f'Failed: {response.message}')
 
 
     # rclpy.spin(node)
