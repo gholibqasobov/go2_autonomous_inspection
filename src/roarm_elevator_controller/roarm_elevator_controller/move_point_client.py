@@ -25,7 +25,7 @@ def main(args=None):
     rclpy.init(args=args)
 
     if len(sys.argv) != 4:
-        print("Usage: ros2 run roarm_moveit_py_client move_point_client.py x y z")
+        print("Usage: enter x y z")
         return
 
     x = float(sys.argv[1])
