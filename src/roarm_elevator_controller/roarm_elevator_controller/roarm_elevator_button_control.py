@@ -79,9 +79,9 @@ def main(args=None):
         [1, 0, 0]
     ])
     
-    robot_to_camera_coord = robot_to_camera_coord + np.dot(robot_to_camera_rot_mtx, apriltag_coord)
+    robot_to_apriltag_coord = robot_to_camera_coord + np.dot(robot_to_camera_rot_mtx, apriltag_coord)
 
-    x, y, z = robot_to_camera_coord
+    x, y, z = robot_to_apriltag_coord
     x -= 0.3
     
     response = node.roarm_move_point_request(x, y, z)
