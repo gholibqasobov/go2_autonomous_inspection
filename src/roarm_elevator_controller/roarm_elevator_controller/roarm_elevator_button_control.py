@@ -71,18 +71,18 @@ def main(args=None):
     # print(apriltag_coord)
     
 
-    robot_to_camera_coord = np.array([0.195, 0.055, 0.01]) # in meters
+    robot_to_camera_coord = np.array([0.14, 0.033, 0.0]) # in meters
     
     robot_to_camera_rot_mtx = np.array([
         [0, 0, 1],
-        [0, -1, 0],
-        [1, 0, 0]
+        [-1, 0, 0],
+        [0, -1, 0]
     ])
     
     robot_to_apriltag_coord = robot_to_camera_coord + np.dot(robot_to_camera_rot_mtx, apriltag_coord)
 
     x, y, z = robot_to_apriltag_coord
-    x -= 0.3
+    
     
     response = node.roarm_move_point_request(x, y, z)
 

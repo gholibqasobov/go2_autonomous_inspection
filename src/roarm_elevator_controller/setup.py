@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
         	'move_point_client = roarm_elevator_controller.move_point_client:main',
+            'roarm_elevator_button_control = roarm_elevator_controller.roarm_elevator_button_control:main',
         ],
     },
 )
