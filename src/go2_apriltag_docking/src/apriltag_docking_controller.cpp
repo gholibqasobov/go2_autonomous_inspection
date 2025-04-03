@@ -46,19 +46,24 @@ class AprilTagDockingController : public rclcpp::Node
     double x_error_ = 0.0;
     double y_error_ = 0.0;
     double theta_error_ = 0.0;
+    bool is_rotating_ = false;
 
     rclcpp::Time last_detection_time_;
     double detection_timeout_ = 0.5; 
 
     // Control gains
-    double k_x_ = 0.15;
-    double k_y_ = 0.2;
-    double k_theta_ = 0.2;
+    double k_x_ = 1;
+    double k_y_ = 1;
+    //double k_theta_ = 0.2;
     
     // Docking thresholds
     double min_x_threshold_ = 0.25; // Stop when within 25cm
     double min_y_threshold_ = 0.08;
-    double min_theta_threshold_ = 0.03;
+    double outer_limit_ = 0.15;
+    double inner_limit_ = 0.03;
+    //double min_theta_threshold_ = 0.03;
+
+
 
     void publish_cmd_vel()
     {
@@ -70,30 +75,44 @@ class AprilTagDockingController : public rclcpp::Node
       apriltag_detected_ = (elapsed < detection_timeout_);
       
       if (apriltag_detected_){
-        // Computing control velocities
-        v_x = k_x_ * x_error_;
-        omega_z = -((k_y_ * y_error_) + (k_theta_ * theta_error_));
-
-        RCLCPP_INFO(this->get_logger(), "Error: %f", x_error_);
-        v_x = std::clamp(v_x, 0.0, 0.15);
-        omega_z = std::clamp(omega_z, -0.5, 0.5);
-        
-        
-
-        // Stop robot when docking is reached
-        if (std::abs(x_error_) <= min_x_threshold_ && std::abs(y_error_) <= min_y_threshold_ && std::abs(theta_error_) <= min_theta_threshold_)
-        {
-          v_x = 0.0;
-          omega_z = 0.0;
-          RCLCPP_INFO(this->get_logger(), "Docking Complete! Stopping the robot.");
+        if (std::abs(y_error_) >= outer_limit_) {
+          is_rotating_ = true;
+        } else if (std::abs(y_error_) <= inner_limit_) {
+          is_rotating_ = false;
         }
 
-
-      } else {
-        RCLCPP_WARN(this->get_logger(), "AprilTag not detected. Robot will not move.");
+        // Main control logic
+      if (is_rotating_) {
           v_x = 0.0;
+          omega_z = -(k_y_ * y_error_);  
+      } else {
+          v_x = k_x_ * x_error_;
           omega_z = 0.0;
       }
+
+      // Docking completion check
+      if (std::abs(x_error_) <= min_x_threshold_) {
+          if (std::abs(y_error_) <= min_y_threshold_) {
+              v_x = 0.0;
+              omega_z = 0.0;
+              RCLCPP_INFO(this->get_logger(), "Docking Complete! Stopping the robot.");
+          } else {
+              // Force rotation when close in X but not aligned in Y
+              v_x = 0.0;
+              omega_z = -(k_y_ * y_error_);
+          }
+      }
+
+      // Clamp velocities
+      v_x = std::clamp(v_x, 0.0, 0.15);
+      omega_z = std::clamp(omega_z, -0.15, 0.15);
+  } 
+  else 
+  {
+      RCLCPP_WARN(this->get_logger(), "AprilTag not detected. Robot will not move.");
+      v_x = 0.0;
+      omega_z = 0.0;
+  }
 
       auto message = sensor_msgs::msg::Joy();
       message.header.stamp = this->get_clock()->now();
@@ -154,3 +173,7 @@ int main(int argc, char * argv[])
 }
 
 // some additional comment from the branch of branch of branch
+
+
+//v_x = k_x_ * x_error_;
+        //omega_z = -((k_y_ * y_error_) + (k_theta_ * theta_error_));
