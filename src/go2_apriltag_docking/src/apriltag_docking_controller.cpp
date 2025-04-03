@@ -53,13 +53,13 @@ class AprilTagDockingController : public rclcpp::Node
 
     // Control gains
     double k_x_ = 0.15;
-    double k_y_ = 0.15;
+    double k_y_ = 0.2;
     //double k_theta_ = 0.2;
     
     // Docking thresholds
     double min_x_threshold_ = 0.25; // Stop when within 25cm
     double min_y_threshold_ = 0.08;
-    double outer_limit_ = 0.25;
+    double outer_limit_ = 0.3;
     double inner_limit_ = 0.15;
     //double min_theta_threshold_ = 0.03;
 
@@ -84,9 +84,11 @@ class AprilTagDockingController : public rclcpp::Node
         // Main control logic
       if (is_rotating_) {
           v_x = 0.0;
-          omega_z = -(k_y_ * y_error_);  
+          //omega_z = -(k_y_ * y_error_); 
+          omega_z = -(k_y_ * std::copysign(1.0, y_error_)); 
       } else {
-          v_x = k_x_ * x_error_;
+          //v_x = k_x_ * x_error_;
+          v_x = k_x_;
           omega_z = 0.0;
       }
 
@@ -99,7 +101,9 @@ class AprilTagDockingController : public rclcpp::Node
           } else {
               // Force rotation when close in X but not aligned in Y
               v_x = 0.0;
-              omega_z = -(k_y_ * y_error_);
+              //omega_z = -(k_y_ * y_error_);
+              omega_z = -(k_y_ * std::copysign(1.0, y_error_)); 
+
           }
       }
 
