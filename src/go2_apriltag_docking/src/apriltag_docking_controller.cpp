@@ -52,8 +52,8 @@ class AprilTagDockingController : public rclcpp::Node
 
     // Control gains
     double k_x_ = 0.2;
-    double k_y_ = 0.3;
-    double k_theta_ = 0.3;
+    double k_y_ = 0.03;
+    double k_theta_ = 0.03;
     
     // Docking thresholds
     double min_x_threshold_ = 0.25; // Stop when within 25cm
@@ -75,8 +75,8 @@ class AprilTagDockingController : public rclcpp::Node
         omega_z = (k_y_ * y_error_) + (k_theta_ * theta_error_);
 
         RCLCPP_INFO(this->get_logger(), "Error: %f", x_error_);
-        v_x = std::clamp(v_x, 0.0, 0.3);
-        omega_z = std::clamp(omega_z, -0.3, 0.3);
+        v_x = std::clamp(v_x, 0.0, 0.15);
+        omega_z = std::clamp(omega_z, -0.15, 0.15);
         
 
         // Stop robot when docking is reached
