@@ -52,15 +52,15 @@ class AprilTagDockingController : public rclcpp::Node
     double detection_timeout_ = 0.5; 
 
     // Control gains
-    double k_x_ = 1;
-    double k_y_ = 1;
+    double k_x_ = 0.15;
+    double k_y_ = 0.15;
     //double k_theta_ = 0.2;
     
     // Docking thresholds
     double min_x_threshold_ = 0.25; // Stop when within 25cm
     double min_y_threshold_ = 0.08;
-    double outer_limit_ = 0.15;
-    double inner_limit_ = 0.03;
+    double outer_limit_ = 0.25;
+    double inner_limit_ = 0.15;
     //double min_theta_threshold_ = 0.03;
 
 
@@ -105,7 +105,7 @@ class AprilTagDockingController : public rclcpp::Node
 
       // Clamp velocities
       v_x = std::clamp(v_x, 0.0, 0.15);
-      omega_z = std::clamp(omega_z, -0.15, 0.15);
+      omega_z = std::clamp(omega_z, -0.2, 0.2);
   } 
   else 
   {
