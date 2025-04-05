@@ -57,9 +57,9 @@ class AprilTagDockingController : public rclcpp::Node
     //double k_theta_ = 0.2;
     
     // Docking thresholds
-    double min_x_threshold_ = 0.25; // Stop when within 25cm
+    double min_x_threshold_ = 0.3; // Stop when within 25cm
     double min_y_threshold_ = 0.08;
-    double outer_limit_ = 0.3;
+    double outer_limit_ = 0.25; // 0.3 was working 
     double inner_limit_ = 0.15;
     //double min_theta_threshold_ = 0.03;
 
@@ -102,10 +102,16 @@ class AprilTagDockingController : public rclcpp::Node
               // Force rotation when close in X but not aligned in Y
               v_x = 0.0;
               //omega_z = -(k_y_ * y_error_);
-              omega_z = -(k_y_ * std::copysign(1.0, y_error_)); 
+              // omega_z = -(k_y_ * std::copysign(1.0, y_error_)); 
+              omega_z = -(k_y_ * y_error_);
 
           }
       }
+
+      /* Let's try method 1 */
+      // if (std::abs(x_error_) <= min_x_threshold_ && std::abs(y_error_) <= min_y_threshold_)
+
+
 
       // Clamp velocities
       v_x = std::clamp(v_x, 0.0, 0.15);
@@ -127,6 +133,7 @@ class AprilTagDockingController : public rclcpp::Node
       
       
       RCLCPP_INFO(this->get_logger(), "Publishing Joy message \n Forward: %f, Rotation: %f", v_x, omega_z);
+      RCLCPP_INFO(this->get_logger(), "Publishing Joy message \n Forward error: %f, Y- error: %f", x_error_, y_error_);
       publisher_->publish(message);
 
 
