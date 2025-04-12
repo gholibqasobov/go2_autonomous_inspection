@@ -59,6 +59,10 @@ import time
 def main(args=None):
     rclpy.init(args=args)
 
+    goal_elevator_button = str(sys.argv[1])
+    
+
+
     node = RoarmElevatorController()
     time.sleep(3)
     
@@ -69,6 +73,18 @@ def main(args=None):
     # apriltag_coord = node.get_apriltag_coord()
 
     # print(apriltag_coord)
+
+    elevator_button_position = { # offset from z-axis
+        'call_up': 0.1,
+        'call_down': -0.1,
+        '-1': -0.1,
+        '0': 0.0,
+        '1': 0.1,
+        '2': 0.2,
+        '3': 0.3,
+        '4': 0.4,
+    }
+
     
 
     robot_to_camera_coord = np.array([0.14, 0.033, 0.0]) # in meters
@@ -82,9 +98,13 @@ def main(args=None):
     robot_to_apriltag_coord = robot_to_camera_coord + np.dot(robot_to_camera_rot_mtx, apriltag_coord)
 
     x, y, z = robot_to_apriltag_coord
+
+    x_offset = -0.05
     
     
-    response = node.roarm_move_point_request(x, y, z)
+    response = node.roarm_move_point_request(x + x_offset, y, z + elevator_button_position[goal_elevator_button])
+    response = node.roarm_move_point_request(x, y, z + elevator_button_position[goal_elevator_button])
+    response = node.roarm_move_point_request(x + x_offset, y, z + elevator_button_position[goal_elevator_button])
 
 
     if response.success:
@@ -98,3 +118,4 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
