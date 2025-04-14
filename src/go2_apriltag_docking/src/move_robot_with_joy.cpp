@@ -63,7 +63,7 @@ private:
         joy_msg.header.frame_id = "teleop_panel";
 
         // Example joystick data
-        joy_msg.axes = {0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0};  
+        joy_msg.axes = {1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0}; // index 0: rotat.z, index 3: linear.y, index 4: linear.x, index 5: manual_mode;
         joy_msg.buttons = {0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0};  
 
         joy_pub_->publish(joy_msg);  // Publish to /joy
