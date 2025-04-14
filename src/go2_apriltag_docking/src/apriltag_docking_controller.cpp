@@ -177,8 +177,7 @@ private:
         if (std::abs(y_error_) < center_threshold_)
         {
           // Tag is centered, stop rotation and start approaching
-          RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
-                            "Approaching tag rotation vel: %.2f ", k_rotation_ * y_error_);
+          
           RCLCPP_INFO(this->get_logger(), "Tag centered. Starting approach...");
           current_state_ = APPROACHING;
           cmd_vel.twist.angular.z = 0.0;
@@ -194,8 +193,9 @@ private:
           else if (cmd_vel.twist.angular.z < -max_angular_speed_)
             cmd_vel.twist.angular.z = -max_angular_speed_;
             
-          RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
-                              "Rotating to center, lateral offset: %.2f", y_error_);
+          RCLCPP_INFO(this->get_logger(), 
+            "ROTATING: offset: %.2f [lin_vel: %.2f, rot_vel: %.2f]", 
+            y_error_, cmd_vel.twist.linear.x, cmd_vel.twist.angular.z);
         }
         break;
         
@@ -205,7 +205,9 @@ private:
         {
           // Need to recenter
           current_state_ = ROTATING;
-          RCLCPP_INFO(this->get_logger(), "Tag off-center. Recentering...");
+          RCLCPP_INFO(this->get_logger(), 
+                      "Tag off-center. Recentering... [lin_vel: %.2f, rot_vel: %.2f]", 
+                      cmd_vel.twist.linear.x, cmd_vel.twist.angular.z);
           break;
         }
         
