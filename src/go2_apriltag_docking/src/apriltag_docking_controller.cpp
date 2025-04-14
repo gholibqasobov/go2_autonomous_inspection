@@ -128,7 +128,8 @@ class AprilTagDockingController : public rclcpp::Node
       message.header.stamp = this->get_clock()->now();
       message.header.frame_id = "teleop_panel";
 
-      message.axes = {0.0, 0.0, 1.0, float(omega_z), float(v_x), 1.0, 0.0, 0.0}; // indices: angular.z: 3, linear.x: 4
+      // message.axes = {0.0, 0.0, 1.0, float(omega_z), float(v_x), 1.0, 0.0, 0.0}; // indices: angular.z: 3, linear.x: 4
+      message.axes = {0.0, 0.0, 0.0, float(omega_z), float(v_x), -1.0, 0.0, 0.0}; // indices: angular.z: 3, linear.x: 4
       message.buttons = {0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0};
       
       
