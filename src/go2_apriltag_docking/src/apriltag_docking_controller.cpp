@@ -19,10 +19,10 @@
 
 using namespace std::chrono_literals;
 
-class ApriltagDockingController : public rclcpp::Node
+class AprilTagDockingController : public rclcpp::Node
 {
 public:
-  ApriltagDockingController()
+  AprilTagDockingController()
   : Node("simple_apriltag_docking_node")
   {
     // Publishers
@@ -33,20 +33,21 @@ public:
     // Subscribers
     apriltag_tf_sub_ = this->create_subscription<tf2_msgs::msg::TFMessage>(
         "/tf", 10, 
-        std::bind(&ApriltagDockingController::tfCallback, this, std::placeholders::_1));
+        std::bind(&AprilTagDockingController::tfCallback, this, std::placeholders::_1));
     
     // Control loop timer
     timer_ = this->create_wall_timer(
-        100ms, std::bind(&ApriltagDockingController::controlLoop, this));
+        100ms, std::bind(&AprilTagDockingController::controlLoop, this));
     
     // Parameters
     this->declare_parameter("tag_frame_id", std::string("elevator_docking"));
     this->declare_parameter("k_rotation", 0.5);
-    this->declare_parameter("k_forward", 0.3);
+    this->declare_parameter("k_forward", 0.3);      // Forward motion gain
     this->declare_parameter("max_forward_speed", 0.3);
-    this->declare_parameter("max_angular_speed", 0.2);
+    this->declare_parameter("max_angular_speed", 0.5);
     this->declare_parameter("center_threshold", 0.05);  // Threshold for considering tag centered
     this->declare_parameter("final_threshold", 0.3);   // Final docking distance
+    this->declare_parameter("final_yaw_threshold", 0.05); // Final yaw alignment threshold (radians)
     this->declare_parameter("tag_timeout", 1.0);        // Seconds to consider tag lost
     
     tag_frame_id_ = this->get_parameter("tag_frame_id").as_string();
@@ -56,6 +57,7 @@ public:
     max_angular_speed_ = this->get_parameter("max_angular_speed").as_double();
     center_threshold_ = this->get_parameter("center_threshold").as_double();
     final_threshold_ = this->get_parameter("final_threshold").as_double();
+    final_yaw_threshold_ = this->get_parameter("final_yaw_threshold").as_double();
     tag_timeout_ = this->get_parameter("tag_timeout").as_double();
 
     last_detection_time_ = this->now();
@@ -74,11 +76,12 @@ private:
   // Parameters
   std::string tag_frame_id_;
   double k_rotation_;
-  double k_forward_;
+  double k_forward_;        // Forward motion gain
   double max_forward_speed_;
   double max_angular_speed_;
   double center_threshold_;
   double final_threshold_;
+  double final_yaw_threshold_;
   double tag_timeout_;
   
   // State variables
@@ -94,6 +97,7 @@ private:
     SEARCHING,
     ROTATING,
     APPROACHING,
+    FINAL_ALIGNMENT,
     DOCKED
   };
   DockingState current_state_ = SEARCHING;
@@ -125,7 +129,7 @@ private:
         pitch_error_ = pitch;
         
         RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                           "Tag detected - Forward: %.2f m, Lateral: %.2f m, Yaw: %.2f rad", 
+                           "Tag detected - Forward: %.2f m, Lateral: %.2f m, Pitch: %.2f rad", 
                            x_error_, y_error_, pitch_error_);
         return;
       }
@@ -152,8 +156,7 @@ private:
       // If no tag is detected or detection timeout, stop the robot and search
       stopRobot();
       current_state_ = SEARCHING;
-      RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 2000, 
-                           "Searching for AprilTag...");
+      RCLCPP_INFO(this->get_logger(), "Searching for AprilTag... [lin_vel: 0.00, rot_vel: 0.00]");
       return;
     }
     
@@ -168,7 +171,7 @@ private:
         if (tag_detected_)
         {
           current_state_ = ROTATING;
-          RCLCPP_INFO(this->get_logger(), "Tag found. Rotating to center...");
+          RCLCPP_INFO(this->get_logger(), "Tag found. Rotating to center... [lin_vel: 0.00, rot_vel: 0.00]");
         }
         break;
         
@@ -177,10 +180,9 @@ private:
         if (std::abs(y_error_) < center_threshold_)
         {
           // Tag is centered, stop rotation and start approaching
-          
-          RCLCPP_INFO(this->get_logger(), "Tag centered. Starting approach...");
           current_state_ = APPROACHING;
           cmd_vel.twist.angular.z = 0.0;
+          RCLCPP_INFO(this->get_logger(), "Tag centered. Starting approach... [lin_vel: 0.00, rot_vel: 0.00]");
         }
         else
         {
@@ -194,8 +196,8 @@ private:
             cmd_vel.twist.angular.z = -max_angular_speed_;
             
           RCLCPP_INFO(this->get_logger(), 
-            "ROTATING: offset: %.2f [lin_vel: %.2f, rot_vel: %.2f]", 
-            y_error_, cmd_vel.twist.linear.x, cmd_vel.twist.angular.z);
+                      "ROTATING: offset: %.2f [lin_vel: %.2f, rot_vel: %.2f]", 
+                      y_error_, cmd_vel.twist.linear.x, cmd_vel.twist.angular.z);
         }
         break;
         
@@ -214,33 +216,66 @@ private:
         // Check if we've reached the final threshold
         if (x_error_ <= final_threshold_)
         {
-          // We've reached the docking position
-          stopRobot();
-          current_state_ = DOCKED;
-          docking_complete_ = true;
-          RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
-                            "Approaching tag, distance: %.2f m, rotation error: %.2f m", x_error_, y_error_);
-          RCLCPP_INFO(this->get_logger(), "Docking complete!");
+          // Reached the docking distance - now perform final alignment
+          current_state_ = FINAL_ALIGNMENT;
+          RCLCPP_INFO(this->get_logger(), 
+                      "Reached docking distance. Performing final alignment... [lin_vel: %.2f, rot_vel: %.2f]", 
+                      cmd_vel.twist.linear.x, cmd_vel.twist.angular.z);
           break;
         }
         
-        // Continue approaching
+        // Continue approaching - using proportional control for forward movement
         cmd_vel.twist.linear.x = max_forward_speed_;
         
+        // Limit the forward speed
+        if (cmd_vel.twist.linear.x > max_forward_speed_)
+          cmd_vel.twist.linear.x = max_forward_speed_;
+          
         // Slow down as we get closer
         if (x_error_ < final_threshold_ * 3.0)
         {
-          cmd_vel.twist.linear.x = max_forward_speed_ * k_forward_;
+          cmd_vel.twist.linear.x = std::min(cmd_vel.twist.linear.x, max_forward_speed_ * k_forward_);
         }
         
-        RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
-                            "Approaching tag, forward velocity: %.2f m", x_error_);
+        // Maintain heading while moving
+        cmd_vel.twist.angular.z = k_rotation_ * y_error_ * 0.5; // Reduced gain during approach
+        
+        RCLCPP_INFO(this->get_logger(), 
+                    "APPROACHING: distance: %.2f [lin_vel: %.2f, rot_vel: %.2f]", 
+                    x_error_, cmd_vel.twist.linear.x, cmd_vel.twist.angular.z);
+        break;
+        
+      case FINAL_ALIGNMENT:
+        // Final alignment - correct any remaining yaw error
+        if (std::abs(pitch_error_) < final_yaw_threshold_ && std::abs(y_error_) < center_threshold_)
+        {
+          // Alignment complete, we're fully docked
+          stopRobot();
+          current_state_ = DOCKED;
+          docking_complete_ = true;
+          RCLCPP_INFO(this->get_logger(), "Final alignment complete. Docking successful! [lin_vel: 0.00, rot_vel: 0.00]");
+        }
+        else
+        {
+          // Perform final alignment
+          cmd_vel.twist.angular.z = k_rotation_ * y_error_;
+          
+          // Limit angular velocity for precision
+          if (cmd_vel.twist.angular.z > max_angular_speed_)
+            cmd_vel.twist.angular.z = max_angular_speed_;
+          else if (cmd_vel.twist.angular.z < -max_angular_speed_)
+            cmd_vel.twist.angular.z = -max_angular_speed_;
+            
+          RCLCPP_INFO(this->get_logger(),
+                      "FINAL_ALIGNMENT: lateral: %.2f, yaw: %.2f [lin_vel: %.2f, rot_vel: %.2f]", 
+                      y_error_, pitch_error_, cmd_vel.twist.linear.x, cmd_vel.twist.angular.z);
+        }
         break;
         
       case DOCKED:
         // Do nothing, we're docked
-        RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
-                            "Approaching tag, distance: %.2f m, rotation error: %.2f m", x_error_, y_error_);
+        RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000, 
+                            "DOCKED: Successfully docked to target [lin_vel: 0.00, rot_vel: 0.00]");
         break;
     }
     
@@ -281,12 +316,17 @@ private:
     joy_msg.axes[0] = norm_angular;
     joy_msg.axes[3] = 0.0;  // No lateral movement in this approach
     joy_msg.axes[4] = norm_linear;
-    joy_msg.axes[5] = -1.0;  // Enable manual mode (-1 according to your code)
+    joy_msg.axes[5] = -1.0;  // Enable manual mode (-1 according to Dosymzhan code)
     
     // Enable manual control button
     joy_msg.buttons[7] = 1;
     
     joy_pub_->publish(joy_msg);
+    
+    // Log state and commands periodically
+    RCLCPP_DEBUG(this->get_logger(), 
+                "State: %d, Linear X: %.2f, Angular Z: %.2f", 
+                static_cast<int>(current_state_), cmd_vel.twist.linear.x, cmd_vel.twist.angular.z);
   }
   
   void publishUnitreeCommand(const geometry_msgs::msg::TwistStamped& cmd_vel)
@@ -341,7 +381,7 @@ private:
 int main(int argc, char *argv[])
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<ApriltagDockingController>();
+  auto node = std::make_shared<AprilTagDockingController>();
   
   RCLCPP_INFO(node->get_logger(), "Starting AprilTag docking node with rotate-then-move approach");
   RCLCPP_INFO(node->get_logger(), "Listening for AprilTag TF transforms with frame ID: elevator_docking");
