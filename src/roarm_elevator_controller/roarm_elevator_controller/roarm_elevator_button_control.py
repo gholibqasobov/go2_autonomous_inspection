@@ -59,7 +59,7 @@ import time
 def main(args=None):
     rclpy.init(args=args)
 
-    goal_elevator_button = str(sys.argv[1])
+    # goal_elevator_button = str(sys.argv[1])
     
 
 
@@ -70,20 +70,20 @@ def main(args=None):
     apriltag_coord = node.get_apriltag_coord()
     node.get_logger().info(f'AprilTag Coordinates: {apriltag_coord}')
     
-    # apriltag_coord = node.get_apriltag_coord()
+    apriltag_coord = node.get_apriltag_coord()
 
-    # print(apriltag_coord)
+    print(apriltag_coord)
 
-    elevator_button_position = { # offset from z-axis
-        'call_up': 0.1,
-        'call_down': -0.1,
-        '-1': -0.1,
-        '0': 0.0,
-        '1': 0.1,
-        '2': 0.2,
-        '3': 0.3,
-        '4': 0.4,
-    }
+    # elevator_button_position = { # offset from z-axis
+    #     'call_up': 0.1,
+    #     'call_down': -0.1,
+    #     '-1': -0.1,
+    #     '0': 0.0,
+    #     '1': 0.1,
+    #     '2': 0.2,
+    #     '3': 0.3,
+    #     '4': 0.4,
+    # }
 
     
 
@@ -99,12 +99,13 @@ def main(args=None):
 
     x, y, z = robot_to_apriltag_coord
 
-    x_offset = -0.05
+    x_offset = 0.05
     
-    
-    response = node.roarm_move_point_request(x + x_offset, y, z + elevator_button_position[goal_elevator_button])
-    response = node.roarm_move_point_request(x, y, z + elevator_button_position[goal_elevator_button])
-    response = node.roarm_move_point_request(x + x_offset, y, z + elevator_button_position[goal_elevator_button])
+    response = node.roarm_move_point_request(x + x_offset, y, z)
+    node.get_logger().info(f"Goal Poing: {x}, {y}, {z}")
+    # response = node.roarm_move_point_request(x + x_offset, y, z + elevator_button_position[goal_elevator_button])
+    # response = node.roarm_move_point_request(x, y, z + elevator_button_position[goal_elevator_button])
+    # response = node.roarm_move_point_request(x + x_offset, y, z + elevator_button_position[goal_elevator_button])
 
 
     if response.success:
