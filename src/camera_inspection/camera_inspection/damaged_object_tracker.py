@@ -5,9 +5,11 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from ultralytics import YOLO
 import cv2
-from collections import defaultdict
 import numpy as np
 from deep_sort_realtime.deepsort_tracker import DeepSort
+import json
+import os
+from datetime import datetime
 
 class DamagedObjectTracker(Node):
     def __init__(self):
@@ -24,6 +26,9 @@ class DamagedObjectTracker(Node):
             self.save_damaged_image,
             10
         )
+
+        # Create a publisher for annotated images
+        self.annotated_image_pub = self.create_publisher(Image, '/annotated_image', 10) # To visualize in Rviz
         
         self.robot_odom_sub  # prevent unused variable warning
         self.camera_sub
@@ -45,19 +50,32 @@ class DamagedObjectTracker(Node):
         
         # Tracking state
         self.unique_ids = set()
+        self.saved_ids = set()  # Track which objects we've already saved
         self.last_gray = None
         self.robot_position = (0, 0, 0)  # x, y, z
         
-        # Create a publisher for annotated images
-        self.annotated_image_pub = self.create_publisher(Image, '/annotated_image', 10)
+        # Create a directory to store object images and data
+        self.output_dir = "src/camera_inspection/damaged_objects"
+        os.makedirs(self.output_dir, exist_ok=True)
+        
+        # Create or load JSON file for storing object data
+        self.json_file = os.path.join(self.output_dir, "damaged_objects_data.json")
+        if os.path.exists(self.json_file):
+            with open(self.json_file, 'r') as f:
+                self.objects_data = json.load(f)
+        else:
+            self.objects_data = []
     
     def save_robot_odom(self, msg):
         """Callback function that gets called when a new TF message is received."""
-        # self.get_logger().info(f'Received TF message with {msg.transforms}')
-        x, y, z = msg.transforms[0].transform.translation.x, msg.transforms[0].transform.translation.y, msg.transforms[0].transform.translation.z
-        self.robot_position = (x, y, z)
-        self.get_logger().info(f"x is {x}, y is {y}, z is {z}")
-        return x, y, z
+        try:
+            x, y, z = msg.transforms[0].transform.translation.x, msg.transforms[0].transform.translation.y, msg.transforms[0].transform.translation.z
+            self.robot_position = (x, y, z)
+            self.get_logger().info(f"x is {x}, y is {y}, z is {z}")
+        except IndexError:
+            self.get_logger().warn("No transforms in TF message")
+        except Exception as e:
+            self.get_logger().error(f"Error processing TF message: {str(e)}")
     
     def save_damaged_image(self, msg):
         """Process camera images and track damaged objects."""
@@ -110,33 +128,38 @@ class DamagedObjectTracker(Node):
                 # Extract bounding box
                 x1, y1, x2, y2 = map(int, t.to_ltrb())
                 
+                # Check if this is a new object that we haven't saved yet
+                is_new_object = tid not in self.saved_ids
+                
                 # Add to detected objects
-                detected_objects.append({
+                object_data = {
                     'id': tid,
                     'bbox': (x1, y1, x2, y2),
                     'robot_position': self.robot_position,
-                    'frame_timestamp': msg.header.stamp
-                })
+                    'timestamp': msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9,
+                    'is_new': is_new_object
+                }
+                detected_objects.append(object_data)
                 
                 # Draw on frame for visualization
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(frame, f"ID:{tid}", (x1, y1-10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                
+                # Add text with different color based on whether it's a new object
+                color = (0, 0, 255) if is_new_object else (0, 255, 0)
+                status = "NEW" if is_new_object else "KNOWN"
+                cv2.putText(frame, f"ID:{tid} ({status})", (x1, y1-10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
             
-            # Log tracking information
+            # Log tracking information and save new objects
             if detected_objects:
                 self.get_logger().info(f"Tracking {len(detected_objects)} objects, {len(self.unique_ids)} unique IDs total")
-                
-                # Here you could add code to save object positions in world coordinates
-                self.save_damaged_object_poses(detected_objects)
+                self.save_damaged_object_poses(detected_objects, frame)
             
             # Add more information to the annotated image
             cv2.putText(frame, f"Unique objects: {len(self.unique_ids)}", (20, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
-            
-            # Local visualization can be enabled for debugging
-            # cv2.imshow("Damaged Object Tracking", frame)
-            # cv2.waitKey(1)
+            cv2.putText(frame, f"Saved objects: {len(self.saved_ids)}", (20, 70),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
             
             # Publish the annotated image
             annotated_msg = self.cv_bridge.cv2_to_imgmsg(frame, encoding='bgr8')
@@ -146,32 +169,69 @@ class DamagedObjectTracker(Node):
         except Exception as e:
             self.get_logger().error(f"Error processing image: {str(e)}")
     
-    def save_damaged_object_poses(self, detected_objects):
-        """Save the poses of detected damaged objects."""
-        # This is where you would implement logic to:
-        # 1. Convert pixel coordinates to 3D coordinates
-        # 2. Transform from camera frame to world frame
-        # 3. Store or publish the detected object poses
+    def save_damaged_object_poses(self, detected_objects, frame):
+        """Save new detected objects' images and poses to a JSON file."""
+        new_objects = [obj for obj in detected_objects if obj['is_new']]
         
-        # Example implementation (placeholder)
-        for obj in detected_objects:
+        if not new_objects:
+            return
+        
+        self.get_logger().info(f"Saving {len(new_objects)} new damaged objects")
+        
+        # Get current timestamp for filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        for obj in new_objects:
             obj_id = obj['id']
-            bbox = obj['bbox']
-            robot_pos = obj['robot_position']
+            x1, y1, x2, y2 = obj['bbox']
             
-            # Calculate centroid of the bounding box
-            cx = (bbox[0] + bbox[2]) / 2
-            cy = (bbox[1] + bbox[3]) / 2
+            # Only save objects we haven't saved before
+            if obj_id in self.saved_ids:
+                continue
+                
+            # Mark as saved
+            self.saved_ids.add(obj_id)
             
-            # For a full implementation, you would:
-            # - Use depth information if available
-            # - Apply camera intrinsics
-            # - Transform to world coordinates
+            # Extract object image
+            # obj_img = frame[y1:y2, x1:x2]
+            obj_img = frame
+            if obj_img.size == 0:
+                self.get_logger().warn(f"Empty region for object ID {obj_id}, skipping")
+                continue
+                
+            # Create filename for the object image
+            img_filename = f"object_{obj_id}_{timestamp}.jpg"
+            img_path = os.path.join(self.output_dir, img_filename)
             
-            self.get_logger().info(f"Object ID {obj_id} detected at pixel ({cx}, {cy})")
-            self.get_logger().info(f"Robot was at position {robot_pos}")
+            # Save the image
+            cv2.imwrite(img_path, obj_img)
             
-            # Add your code to store this information in a database or publish it
+            # Prepare data for JSON
+            object_data = {
+                'id': obj_id,
+                'image_file': img_filename,
+                'robot_position': {
+                    'x': obj['robot_position'][0],
+                    'y': obj['robot_position'][1],
+                    'z': obj['robot_position'][2]
+                },
+                'timestamp': obj['timestamp'],
+                'bbox': {
+                    'x1': x1,
+                    'y1': y1,
+                    'x2': x2,
+                    'y2': y2
+                }
+            }
+            
+            # Add to objects data
+            self.objects_data.append(object_data)
+            
+            self.get_logger().info(f"Saved object ID {obj_id} to {img_path}")
+        
+        # Save updated JSON file
+        with open(self.json_file, 'w') as f:
+            json.dump(self.objects_data, f, indent=2)
 
 def main(args=None):
     rclpy.init(args=args)
