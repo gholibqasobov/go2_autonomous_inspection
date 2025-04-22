@@ -50,7 +50,7 @@ class ElevatorButtonPushActionServer(Node):
             cancel_callback=self.cancel_callback
         )
         
-        # AprilTag pose state
+        
         self.apriltag_coord = None
         self._goal_handle = None
         self._goal_canceled = False
@@ -116,7 +116,7 @@ class ElevatorButtonPushActionServer(Node):
         # Create and populate result
         result = PushElevatorButton.Result()
         
-        # Extract floor number and convert to label
+        # Extract floor number and apriltag_frame
         self._target_apriltag_frame = goal_handle.request.apriltag_frame
         floor_number = goal_handle.request.floor_number
         
@@ -125,9 +125,6 @@ class ElevatorButtonPushActionServer(Node):
             result.success = False
             goal_handle.abort()
             return result
-            
-        # floor_label = self.ELEVATOR_BUTTON_OFFSETS[floor_number]
-        # self.get_logger().info(f'Pushing button for floor: {floor_label}')
 
         # Set initial feedback
         feedback_msg = PushElevatorButton.Feedback()
@@ -151,7 +148,6 @@ class ElevatorButtonPushActionServer(Node):
                 return result
                 
             # Sleep briefly to avoid burning CPU
-            # await rclpy.sleep(0.1)
             time.sleep(0.1)
 
         
@@ -197,7 +193,7 @@ class ElevatorButtonPushActionServer(Node):
                 
                 self.get_logger().info(f'Moving to point {idx+1}: ({px:.3f}, {py:.3f}, {pz:.3f})')
                 
-                # Call service to move arm
+                
                 request = MovePointCmd.Request()
                 request.x = px
                 request.y = py
@@ -212,10 +208,9 @@ class ElevatorButtonPushActionServer(Node):
                     return result
                 
                 # Add a small delay between movements
-                # await rclpy.sleep(0.5)
                 time.sleep(0.5)
 
-            # Now return to home position
+            # return to home position
             feedback_msg.current_state = 'RETURNING_TO_HOME'
             goal_handle.publish_feedback(feedback_msg)
 
@@ -236,7 +231,7 @@ class ElevatorButtonPushActionServer(Node):
                     return result
 
                         
-            # Button push completed successfully
+            
             self.get_logger().info(f'Successfully pushed button for floor {floor_number}')
             result.success = True
             goal_handle.succeed()
@@ -252,7 +247,7 @@ class ElevatorButtonPushActionServer(Node):
 def main(args=None):
     rclpy.init(args=args)
     
-    # Create the action server node
+    
     elevator_action_server = ElevatorButtonPushActionServer()
     
     # Use MultiThreadedExecutor to handle callbacks
