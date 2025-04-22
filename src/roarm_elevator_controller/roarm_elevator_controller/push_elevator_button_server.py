@@ -6,7 +6,7 @@ from rclpy.executors import MultiThreadedExecutor
 from tf2_msgs.msg import TFMessage
 from roarm_moveit.srv import MovePointCmd
 from go2_interfaces.action import PushElevatorButton
-
+import time
 import numpy as np
 
 
@@ -55,6 +55,7 @@ class ElevatorButtonPushActionServer(Node):
         self._goal_handle = None
         self._goal_canceled = False
         self._target_apriltag_frame = None
+        self._robot_home_pose = (0.4, 0.0, 0.2)
         
         # AprilTag pose subscriber
         self.subscription = self.create_subscription(
@@ -150,7 +151,9 @@ class ElevatorButtonPushActionServer(Node):
                 return result
                 
             # Sleep briefly to avoid burning CPU
-            await rclpy.sleep(0.1)
+            # await rclpy.sleep(0.1)
+            time.sleep(0.1)
+
         
         # Update feedback
         feedback_msg.current_state = 'PLANNING_MOVEMENT'
@@ -209,8 +212,30 @@ class ElevatorButtonPushActionServer(Node):
                     return result
                 
                 # Add a small delay between movements
-                await rclpy.sleep(0.5)
-            
+                # await rclpy.sleep(0.5)
+                time.sleep(0.5)
+
+            # Now return to home position
+            feedback_msg.current_state = 'RETURNING_TO_HOME'
+            goal_handle.publish_feedback(feedback_msg)
+
+            home_x, home_y, home_z = self._robot_home_pose
+            self.get_logger().info(f'Returning to home position: ({home_x:.3f}, {home_y:.3f}, {home_z:.3f})')
+
+            request = MovePointCmd.Request()
+            request.x = home_x
+            request.y = home_y
+            request.z = home_z
+
+            response = await self.client.call_async(request)
+
+            if not response.success:
+                    self.get_logger().error(f'Movement failed: {response.message}')
+                    result.success = False
+                    goal_handle.abort()
+                    return result
+
+                        
             # Button push completed successfully
             self.get_logger().info(f'Successfully pushed button for floor {floor_number}')
             result.success = True

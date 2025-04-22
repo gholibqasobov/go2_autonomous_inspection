@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
         	'move_point_client = roarm_elevator_controller.move_point_client:main',
             'roarm_elevator_button_control = roarm_elevator_controller.roarm_elevator_button_control:main',
+            'push_elevator_button_server = roarm_elevator_controller.push_elevator_button_server:main',
         ],
     },
 )
