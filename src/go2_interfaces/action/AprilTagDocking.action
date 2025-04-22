@@ -1,0 +1,9 @@
+# Goal
+string apriltag_frame
+---
+# Result
+bool success
+---
+# Feedback
+string current_state
+string distance_to_goal

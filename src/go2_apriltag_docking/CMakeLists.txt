@@ -22,6 +22,9 @@ find_package(unitree_api REQUIRED)
 set(go2_sport_api_DIR "/home/$USER/autonomy_stack_go2/install/go2_sport_api")
 find_package(go2_sport_api REQUIRED)
 
+find_package(go2_interfaces REQUIRED)
+find_package(rclcpp_action REQUIRED)
+
 
 add_executable(talker src/move_robot.cpp)
 ament_target_dependencies(talker rclcpp std_msgs geometry_msgs unitree_api go2_sport_api)
@@ -40,12 +43,16 @@ add_executable(move_robot_with_joy src/move_robot_with_joy.cpp)
 ament_target_dependencies(move_robot_with_joy rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs)
 
 
+add_executable(apriltag_docking_server src/apriltag_docking_server.cpp)
+ament_target_dependencies(apriltag_docking_server rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs tf2 go2_interfaces rclcpp_action)
+
 install(TARGETS
   talker
   apriltag_docking
   apriltag_pose_sub
   apriltag_docking_controller
   move_robot_with_joy
+  apriltag_docking_server
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
