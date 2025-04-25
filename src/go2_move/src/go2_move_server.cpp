@@ -104,21 +104,21 @@ private:
 
     void robotPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
     {
-        current_x_ = msg->pose.pose.position.x;
-        current_y_ = msg->pose.pose.position.y;
+        current_x_ = msg->pose.position.x;
+        current_y_ = msg->pose.position.y;
 
         // quaternion to Euler
 
-        double qx = msg->pose.pose.orientation.x;
-        double qy = msg->pose.pose.orientation.y;
-        double qz = msg->pose.pose.orientation.z;
-        double qw = msg->pose.pose.orientation.w;
+        double qx = msg->pose.orientation.x;
+        double qy = msg->pose.orientation.y;
+        double qz = msg->pose.orientation.z;
+        double qw = msg->pose.orientation.w;
 
         current_theta_ = std::atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
         
 
 
-        current_theta_ = msg->pose.pose.orientation.z;
+        // current_theta_ = msg->pose.pose.orientation.z;
 
         RCLCPP_DEBUG(this->get_logger(), "Current pose: x=%.2f, y=%.2f, theta=%.2f", 
                     current_x_, current_y_, current_theta_);
