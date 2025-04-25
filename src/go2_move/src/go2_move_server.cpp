@@ -8,7 +8,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "sensor_msgs/msg/joy.hpp"  // Include Joy message header
-#include "nav_msgs/msg/odometry.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
 
 // For real robot
 #include "unitree_api/msg/request.hpp"
@@ -25,8 +25,8 @@ public:
         cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>("/cmd_vel", 10);
         go2_request_pub_ = this->create_publisher<unitree_api::msg::Request>("/api/sport/request", 10);
         joy_pub_ = this->create_publisher<sensor_msgs::msg::Joy>("/joy", 10);  // Add publisher for /joy
-        odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-            "/utlidar/robot_odom",
+        odom_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+            "/utlidar/robot_pose",
             10,
             std::bind(&MoveRobotServer::robotPoseCallback, this, std::placeholders::_1));
 
@@ -70,7 +70,7 @@ private:
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr cmd_vel_pub_;
     rclcpp::Publisher<unitree_api::msg::Request>::SharedPtr go2_request_pub_;
     rclcpp::Publisher<sensor_msgs::msg::Joy>::SharedPtr joy_pub_;  // Define Joy publisher
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr odom_sub_;
 
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Time start_time_;
@@ -102,10 +102,22 @@ private:
     
 
 
-    void robotPoseCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
+    void robotPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
     {
         current_x_ = msg->pose.pose.position.x;
         current_y_ = msg->pose.pose.position.y;
+
+        // quaternion to Euler
+
+        double qx = msg->pose.pose.orientation.x;
+        double qy = msg->pose.pose.orientation.y;
+        double qz = msg->pose.pose.orientation.z;
+        double qw = msg->pose.pose.orientation.w;
+
+        current_theta_ = std::atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
+        
+
+
         current_theta_ = msg->pose.pose.orientation.z;
 
         RCLCPP_DEBUG(this->get_logger(), "Current pose: x=%.2f, y=%.2f, theta=%.2f", 
