@@ -8,6 +8,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "sensor_msgs/msg/joy.hpp"  // Include Joy message header
+#include "nav_msgs/msg/odometry.hpp"
 
 // For real robot
 #include "unitree_api/msg/request.hpp"
@@ -19,40 +20,169 @@ class MoveRobotServer : public rclcpp::Node
 {
 public:
     MoveRobotServer()
-        : Node("docking_cmd_vel_publisher"), move_duration_(3s)
+        : Node("move_robot_server")
     {
         cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>("/cmd_vel", 10);
         go2_request_pub_ = this->create_publisher<unitree_api::msg::Request>("/api/sport/request", 10);
         joy_pub_ = this->create_publisher<sensor_msgs::msg::Joy>("/joy", 10);  // Add publisher for /joy
+        odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
+            "/utlidar/robot_odom",
+            10,
+            std::bind(&MoveRobotServer::robotPoseCallback, this, std::placeholders::_1));
 
-        start_time_ = this->now();
-        timer_ = this->create_wall_timer(100ms, std::bind(&MoveRobotServer::moveForward, this));
+
+        goal_x_ = 0.0;
+        goal_y_ = 0.0;
+        goal_theta_ = 0.0;
+
+        current_x_ = 0.0;
+        current_y_ = 0.0;
+        current_theta_ = 0.0;
+
+        init_x_ = 0.0;
+        init_y_ = 0.0;
+        init_theta_ = 0.0;
+        init_pose_received_ = false;
+
+        position_tolerance_ = 0.05;
+        angle_tolerance_ = 0.05;
+
+        vel_ = 0.3;
+
+        is_moving_ = false;
+
+        timer_ = this->create_wall_timer(100ms, std::bind(&MoveRobotServer::controlLoop, this));
+    }
+
+    void moveToGoal(double x, double y, double theta)
+    {
+        goal_x_ = x;
+        goal_y_ = y;
+        goal_theta_ = theta;
+
+        RCLCPP_INFO(this->get_logger(), "Setting new goal: x=%.2f, y=%.2f, theta=%.2f", x, y, theta);
+        
+        is_moving_ = true;
+
     }
 
 private:
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr cmd_vel_pub_;
     rclcpp::Publisher<unitree_api::msg::Request>::SharedPtr go2_request_pub_;
     rclcpp::Publisher<sensor_msgs::msg::Joy>::SharedPtr joy_pub_;  // Define Joy publisher
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
 
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Time start_time_;
-    std::chrono::seconds move_duration_;
 
-    void moveForward()
+    // Goal position
+    double goal_x_;
+    double goal_y_;
+    double goal_theta_;
+    
+    // Current position
+    double current_x_;
+    double current_y_;
+    double current_theta_;
+    
+    // Control parameters
+    double position_tolerance_;
+    double angle_tolerance_;
+    
+    // Movement state
+    bool is_moving_;
+
+    double init_x_;
+    double init_y_;
+    double init_theta_;
+    bool init_pose_received_;
+
+    double vel_;
+
+    
+
+
+    void robotPoseCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
-        if ((this->now() - start_time_).seconds() >= move_duration_.count())
+        current_x_ = msg->pose.pose.position.x;
+        current_y_ = msg->pose.pose.position.y;
+        current_theta_ = msg->pose.pose.orientation.z;
+
+        RCLCPP_DEBUG(this->get_logger(), "Current pose: x=%.2f, y=%.2f, theta=%.2f", 
+                    current_x_, current_y_, current_theta_);
+        
+        if(!init_pose_received_)
         {
-            stopRobot();
+            init_x_ = current_x_;
+            init_y_ = current_y_;
+            init_theta_ = current_theta_;
+            init_pose_received_ = true;
+        }
+    }
+
+
+    void controlLoop()
+    {
+        if(!is_moving_ || !init_pose_received_) 
+        {
             return;
         }
+        
+        // Error in each direction 
+        double x_error = (init_x_ + goal_x_) - current_x_;
+        double y_error = (init_y_ + goal_y_) - current_y_;
+        double theta_error = (init_theta_ + goal_theta_) - current_theta_;
+        
+        // Check if reached the goal position within tolerance
+        bool reached_x = std::abs(x_error) < position_tolerance_;
+        bool reached_y = std::abs(y_error) < position_tolerance_;
+        bool reached_theta = std::abs(theta_error) < angle_tolerance_;
+
+        if (reached_x && reached_y && reached_theta) {
+            RCLCPP_INFO(this->get_logger(), "Goal reached! Stopping robot.");
+            stopRobot();
+            is_moving_ = false;
+            return;
+        }
+
+
+        // Calculate velocity commands
+        double x_vel = 0.0;
+        double y_vel = 0.0;
+        double theta_vel = 0.0;
+
+        if (!reached_x) {
+            x_vel = vel_ * (x_error > 0 ? 1.0 : -1.0);
+        }
+        
+        if (!reached_y) {
+            y_vel = vel_ * (y_error > 0 ? 1.0 : -1.0);
+        }
+        
+        if (!reached_theta) {
+            theta_vel = vel_ * (theta_error > 0 ? 1.0 : -1.0);  // Slower rotation
+        }
+
+        RCLCPP_INFO(this->get_logger(), "Moving: x_vel=%.2f, y_vel=%.2f, theta_vel=%.2f", 
+                   x_vel, y_vel, theta_vel);
+        
+        publishVelocityCommands(x_vel, y_vel, theta_vel);
+
+
+    }
+
+    
+
+    void publishVelocityCommands(float x_vel=0.0, float y_vel=0.0, float theta_vel=0.0)
+    {
 
         // Publish TwistStamped message
         geometry_msgs::msg::TwistStamped cmd_vel;
         cmd_vel.header.stamp = this->now();
         cmd_vel.header.frame_id = "vehicle";
-        cmd_vel.twist.linear.x = 0.0;
-        cmd_vel.twist.linear.y = 0.0;
-        cmd_vel.twist.angular.z = 0.0;
+        cmd_vel.twist.linear.x = x_vel;
+        cmd_vel.twist.linear.y = y_vel;
+        cmd_vel.twist.angular.z = theta_vel;
 
         RCLCPP_INFO(this->get_logger(), "Moving Forward...");
         cmd_vel_pub_->publish(cmd_vel);
@@ -63,7 +193,7 @@ private:
         joy_msg.header.frame_id = "teleop_panel";
 
         // Example joystick data
-        joy_msg.axes = {1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0}; // index 0: rotat.z, index 3: linear.y, index 4: linear.x, index 5: manual_mode;
+        joy_msg.axes = {theta_vel, 0.0, 0.0, y_vel, x_vel, -1.0, 0.0, 0.0}; // index 0: rotat.z, index 3: linear.y, index 4: linear.x, index 5: manual_mode;
         joy_msg.buttons = {0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0};  
 
         joy_pub_->publish(joy_msg);  // Publish to /joy
@@ -108,7 +238,12 @@ private:
 int main(int argc, char *argv[])
 {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<MoveRobotServer>());
+    // rclcpp::spin(std::make_shared<MoveRobotServer>());
+    auto node = std::make_shared<MoveRobotServer>();
+
+    node->moveToGoal(0.0, 1.0, 0.0);
+
+    rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
 }
