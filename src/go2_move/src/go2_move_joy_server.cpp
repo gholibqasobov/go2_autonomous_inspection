@@ -32,7 +32,7 @@ public:
         // Parameters
         this->declare_parameter("x_vel", 0.3);
         this->declare_parameter("y_vel", 0.3);      
-        this->declare_parameter("rot_vel", 0.3);
+        this->declare_parameter("theta_vel", 0.3);
         x_vel_ = this->get_parameter("x_vel").as_double();
         y_vel_ = this->get_parameter("y_vel").as_double();
         theta_vel_ = this->get_parameter("theta_vel").as_double();
@@ -68,10 +68,10 @@ private:
         auto now = this->now();
         double elapsed = (now - start_time_).seconds();
 
-
-        double vx = (elapsed < x_duration_) ? x_vel_ : 0.0;
-        double vy = (elapsed < y_duration_) ? y_vel_ : 0.0;
-        double vtheta = (elapsed < theta_duration_) ? theta_vel_ : 0.0;
+        // velocity is time dependant, multiply duration by 1/vel to make displacement dependent
+        float vx = (elapsed < x_duration_/x_vel_) ? x_vel_ : 0.0;
+        float vy = (elapsed < y_duration_/y_vel_) ? y_vel_ : 0.0;
+        float vtheta = (elapsed < theta_duration_/theta_vel_) ? theta_vel_ : 0.0;
 
         if (elapsed >= std::max({x_duration_, y_duration_, theta_duration_}))
         {
