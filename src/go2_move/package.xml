@@ -18,6 +18,7 @@
   <depend>tf2_msgs</depend>
   <depend>tf2</depend>
   <depend>go2_interfaces</depend>
+  <depend>rclcpp_action</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

@@ -18,6 +18,7 @@ find_package(tf2 REQUIRED)
 find_package(nav_msgs REQUIRED)
 
 
+
 set(unitree_api_DIR "/home/$USER/autonomy_stack_go2/install/unitree_api")
 find_package(unitree_api REQUIRED)
 set(go2_sport_api_DIR "/home/$USER/autonomy_stack_go2/install/go2_sport_api")
@@ -32,7 +33,7 @@ add_executable(go2_move_server src/go2_move_server.cpp)
 ament_target_dependencies(go2_move_server rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs nav_msgs)
 
 add_executable(go2_move_joy_server src/go2_move_joy_server.cpp)
-ament_target_dependencies(go2_move_joy_server rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs)
+ament_target_dependencies(go2_move_joy_server rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs rclcpp_action go2_interfaces)
 
 
 install(TARGETS
