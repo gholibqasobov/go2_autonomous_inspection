@@ -29,11 +29,11 @@ find_package(rclcpp_action REQUIRED)
 
 
 
-add_executable(go2_move_server src/go2_move_server.cpp)
-ament_target_dependencies(go2_move_server rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs nav_msgs)
-
 add_executable(go2_move_joy_server src/go2_move_joy_server.cpp)
-ament_target_dependencies(go2_move_joy_server rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs rclcpp_action go2_interfaces)
+ament_target_dependencies(go2_move_joy_server rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs nav_msgs)
+
+add_executable(go2_move_server src/go2_move_server.cpp)
+ament_target_dependencies(go2_move_server rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs rclcpp_action go2_interfaces)
 
 
 install(TARGETS
