@@ -30,11 +30,11 @@ public:
     
         
         // Parameters
-        this->declare_parameter("x_vel", 0.35);
-        this->declare_parameter("y_vel", 0.17);      
+        this->declare_parameter("x_vel", 0.3);
+        this->declare_parameter("y_vel", 0.3);      
         this->declare_parameter("theta_vel", 0.3);
-        this->declare_parameter("disp_x", 0.45); // x-axis displayment in 1 second with 0.3 vel
-        this->declare_parameter("disp_y", 0.45); // y-axis displayment in 1 second with 0.3 vel
+        this->declare_parameter("disp_x", 0.35); // x-axis displayment in 1 second with 0.3 vel
+        this->declare_parameter("disp_y", 0.17); // y-axis displayment in 1 second with 0.3 vel
         this->declare_parameter("disp_theta", 0.45); // theta-angle displayment in 1 second with 0.3 vel
         x_vel_ = this->get_parameter("x_vel").as_double();
         y_vel_ = this->get_parameter("y_vel").as_double();
