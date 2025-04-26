@@ -23,6 +23,7 @@ setup(
             'elevator_controller_client = elevator_controller.elevator_controller_client:main',
             'apriltag_docking_client = elevator_controller.apriltag_docking_client:main',
             'elevator_button_push_client = elevator_controller.elevator_button_push_client:main',
+            'move_robot_client = elevator_controller.move_robot_client:main',
         ],
     },
 )
