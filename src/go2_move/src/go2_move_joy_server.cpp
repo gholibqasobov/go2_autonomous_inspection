@@ -144,31 +144,15 @@ int main(int argc, char *argv[])
     // rclcpp::spin(std::make_shared<MoveRobotServer>());
     auto node = std::make_shared<MoveRobotServer>();
 
-    double goal_x = 0.0;
-    double goal_y = 0.0;
-    double goal_theta = 0.0;
-
-    if (argc >= 4)
-    {
-        try {
-            goal_x = std::stod(argv[1]);
-            goal_y = std::stod(argv[2]);
-            goal_theta = std::stod(argv[3]);
-        } catch (const std::exception &e) {
-            RCLCPP_ERROR(node->get_logger(), "Invalid arguments. Usage: ros2 run <package> <executable> x y theta");
-            rclcpp::shutdown();
-            return 1;
-        }
-    }
-    else
-    {
-        RCLCPP_WARN(node->get_logger(), "Insufficient arguments");
-        goal_x = 0.0;
-        goal_y = 0.0;
-        goal_theta = 0.0;
-    }
-
-    node->moveToGoal(goal_x, goal_y, goal_theta);
+    if (argc == 4) {
+        double gx = std::stod(argv[1]);
+        double gy = std::stod(argv[2]);
+        double gt = std::stod(argv[3]);
+        node->moveToGoal(gx, gy, gt);
+      } else {
+        RCLCPP_WARN(node->get_logger(),
+                    "Usage: ros2 run <pkg> <exe> <x_dur> <y_dur> <theta_dur>");
+      }
 
 
     rclcpp::spin(node);
