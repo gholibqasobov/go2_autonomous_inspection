@@ -33,9 +33,16 @@ public:
         this->declare_parameter("x_vel", 0.3);
         this->declare_parameter("y_vel", 0.3);      
         this->declare_parameter("theta_vel", 0.3);
+        this->declare_parameter("disp_x", 0.45); // x-axis displayment in 1 second with 0.3 vel
+        this->declare_parameter("disp_y", 0.45); // y-axis displayment in 1 second with 0.3 vel
+        this->declare_parameter("disp_theta", 0.45); // theta-angle displayment in 1 second with 0.3 vel
         x_vel_ = this->get_parameter("x_vel").as_double();
         y_vel_ = this->get_parameter("y_vel").as_double();
         theta_vel_ = this->get_parameter("theta_vel").as_double();
+
+        disp_x_ = this->get_parameter("disp_x").as_double();
+        disp_y_ = this->get_parameter("disp_y").as_double();
+        disp_theta_ = this->get_parameter("disp_theta").as_double();
     }
 
     
@@ -62,6 +69,7 @@ private:
     
     double x_duration_, y_duration_, theta_duration_;
     double x_vel_, y_vel_, theta_vel_;
+    double disp_x_, disp_y_, disp_theta_;
 
     void moveRobot()
     {
@@ -69,9 +77,9 @@ private:
         double elapsed = (now - start_time_).seconds();
 
         // velocity is time dependant, multiply duration by 1/vel to make displacement dependent
-        float vx = (elapsed < x_duration_/x_vel_) ? x_vel_ : 0.0;
-        float vy = (elapsed < y_duration_/y_vel_) ? y_vel_ : 0.0;
-        float vtheta = (elapsed < theta_duration_/theta_vel_) ? theta_vel_ : 0.0;
+        float vx = (elapsed < x_duration_/disp_x_) ? x_vel_ : 0.0;
+        float vy = (elapsed < y_duration_/disp_y_) ? y_vel_ : 0.0;
+        float vtheta = (elapsed < theta_duration_/disp_theta_) ? theta_vel_ : 0.0;
 
         if (elapsed >= std::max({x_duration_, y_duration_, theta_duration_}))
         {
@@ -93,6 +101,7 @@ private:
         // Publish Joy message
         sensor_msgs::msg::Joy joy_msg;
         joy_msg.header.stamp = this->now();
+
         joy_msg.header.frame_id = "teleop_panel";
 
         // Example joystick data
