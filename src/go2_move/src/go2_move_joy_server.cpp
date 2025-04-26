@@ -81,7 +81,7 @@ private:
         float vy = (elapsed < y_duration_/disp_y_) ? y_vel_ : 0.0;
         float vtheta = (elapsed < theta_duration_/disp_theta_) ? theta_vel_ : 0.0;
 
-        if (elapsed >= std::max({x_duration_, y_duration_, theta_duration_}))
+        if (elapsed >= std::max({x_duration_/disp_x_, y_duration_/disp_y_, theta_duration_/disp_theta_}))
         {
             stopRobot();
             return;
