@@ -30,8 +30,8 @@ public:
     
         
         // Parameters
-        this->declare_parameter("x_vel", 0.3);
-        this->declare_parameter("y_vel", 0.3);      
+        this->declare_parameter("x_vel", 0.35);
+        this->declare_parameter("y_vel", 0.17);      
         this->declare_parameter("theta_vel", 0.3);
         this->declare_parameter("disp_x", 0.45); // x-axis displayment in 1 second with 0.3 vel
         this->declare_parameter("disp_y", 0.45); // y-axis displayment in 1 second with 0.3 vel
@@ -95,7 +95,7 @@ private:
         cmd_vel.twist.linear.y = vy;
         cmd_vel.twist.angular.z = vtheta;
 
-        RCLCPP_INFO(this->get_logger(), "Moving Forward...");
+        RCLCPP_INFO(this->get_logger(), "Moving to x=%.2f, y=%.2f, theta=%.2f", x_duration_, y_duration_, theta_duration_);
         cmd_vel_pub_->publish(cmd_vel);
 
         // Publish Joy message
