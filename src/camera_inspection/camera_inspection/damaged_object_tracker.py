@@ -121,19 +121,25 @@ class DamagedObjectTracker(Node):
             for t in tracks:
                 if not t.is_confirmed():
                     continue
-                    
+
                 tid = t.track_id
                 self.unique_ids.add(tid)
-                
+
                 # Extract bounding box
                 x1, y1, x2, y2 = map(int, t.to_ltrb())
-                
+
+                # Get class information
+                cls_id = t.det_class
+                class_name = self.model.names.get(cls_id, str(cls_id))
+
                 # Check if this is a new object that we haven't saved yet
                 is_new_object = tid not in self.saved_ids
-                
-                # Add to detected objects
+
+                # Add to detected objects with class info
                 object_data = {
                     'id': tid,
+                    'class_id': cls_id,
+                    'class_name': class_name,
                     'bbox': (x1, y1, x2, y2),
                     'robot_position': self.robot_position,
                     'timestamp': msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9,
@@ -147,7 +153,7 @@ class DamagedObjectTracker(Node):
                 # Add text with different color based on whether it's a new object
                 color = (0, 0, 255) if is_new_object else (0, 255, 0)
                 status = "NEW" if is_new_object else "KNOWN"
-                cv2.putText(frame, f"ID:{tid} ({status})", (x1, y1-10),
+                cv2.putText(frame, f"{class_name} ID:{tid} ({status})", (x1, y1-10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
             
             # Log tracking information and save new objects
@@ -209,6 +215,7 @@ class DamagedObjectTracker(Node):
             # Prepare data for JSON
             object_data = {
                 'id': obj_id,
+                'class_name': obj.get('class_name'),
                 'image_file': img_filename,
                 'robot_position': {
                     'x': obj['robot_position'][0],

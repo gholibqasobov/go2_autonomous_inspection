@@ -7,3 +7,7 @@ ros2 run map_provider swtich_map 2
 ros2 run camera_inspection damaged_objects_rviz_publisher
 ```
 3. Start rviz and add with map also 'MarkerArray' and topic '/damaged_objects_markers'
+
+
+colcon build --packages-select camera_inspection
+
