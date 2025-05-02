@@ -141,7 +141,8 @@ def main(args=None):
     sequence = [
         {'type': 'docking', 'apriltag_frame': 'elevator_panel'},
         {'type': 'button', 'floor_number': 2, 'apriltag_frame': 'elevator_panel'},
-        {'type': 'move', 'x': 0, 'y': 1, 'theta': 0}
+        {'type': 'move', 'x': 0, 'y': 0.3, 'theta': 0},
+        {'type': 'docking', 'apriltag_frame': 'elevator_panel'}
     ]
     node.run_sequence(sequence)
 
