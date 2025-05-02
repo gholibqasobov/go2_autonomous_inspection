@@ -32,9 +32,9 @@ class MoveRobotClient(Node):
         
         # Create goal message
         goal_msg = MoveToGoal.Goal()
-        goal_msg.x = int(x)
-        goal_msg.y = int(y)
-        goal_msg.theta = int(theta)
+        goal_msg.x = float(x)
+        goal_msg.y = float(y)
+        goal_msg.theta = float(theta)
 
         self.get_logger().info(f"Sending goal to MoveRobot x: {x}, y: {y}, theta: {theta}")
         

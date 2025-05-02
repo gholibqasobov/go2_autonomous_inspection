@@ -76,7 +76,7 @@ private:
         std::shared_ptr<const MoveToGoal::Goal> goal)
     {
         // Fix format specifiers to match the actual types
-        RCLCPP_INFO(this->get_logger(), "Received goal request: x=%d, y=%d, theta=%d", goal->x, goal->y, goal->theta);
+        RCLCPP_INFO(this->get_logger(), "Received goal request: x=%.2f, y=%.2f, theta=%.2f", goal->x, goal->y, goal->theta);
         (void)uuid;
         return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
     }

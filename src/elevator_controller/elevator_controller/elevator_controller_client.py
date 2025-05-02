@@ -108,7 +108,7 @@ class ElevatorControllerClient(Node):
         self.get_logger().info('Waiting for Move Robot server...')
         client = self._clients['move']
         client.wait_for_server()
-        goal = MoveToGoal.Goal(x=int(x), y=int(y), theta=int(theta))
+        goal = MoveToGoal.Goal(x=float(x), y=float(y), theta=float(theta))
         fut = client.send_goal_async(goal, feedback_callback=self._move_feedback)
         fut.add_done_callback(lambda f: self._on_move_response(f, done_cb))
 
