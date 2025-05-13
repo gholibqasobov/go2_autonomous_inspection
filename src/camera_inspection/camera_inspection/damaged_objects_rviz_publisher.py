@@ -73,7 +73,9 @@ class DamagedObjectsRvizPublisher(Node):
             text_marker.color.g = 1.0
             text_marker.color.b = 1.0
             text_marker.color.a = 1.0
-            text_marker.text = f"ID:{obj.get('id', idx)}"
+            # Include class name in the label if available
+            class_name = obj.get('class_name', '')
+            text_marker.text = f"{class_name}_ID:{obj.get('id', idx)}"
             marker_array.markers.append(text_marker)
 
         self.publisher.publish(marker_array)

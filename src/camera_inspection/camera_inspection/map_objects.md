@@ -11,3 +11,6 @@ ros2 run camera_inspection damaged_objects_rviz_publisher
 
 colcon build --packages-select camera_inspection
 
+
+source install/setup.bash
+
