@@ -35,7 +35,7 @@ public:
         this->declare_parameter("theta_vel", 0.3);
         this->declare_parameter("disp_x", 0.35);
         this->declare_parameter("disp_y", 0.17);
-        this->declare_parameter("disp_theta", 0.45);
+        this->declare_parameter("disp_theta", 0.45); // 180 degrees in 3.5 seconds
 
         x_vel_ = this->get_parameter("x_vel").as_double();
         y_vel_ = this->get_parameter("y_vel").as_double();
@@ -97,11 +97,11 @@ private:
 
         x_duration_ = std::abs(goal->x);
         y_duration_ = std::abs(goal->y);
-        theta_duration_ = std::abs(goal->theta);
+        theta_duration_ = (std::abs(goal->theta) * 3.5) / 180; // 180 degrees in 3.5 sec
 
         x_sign_ = (goal->x < 0) ? -1.0 : 1.0;
         y_sign_ = (goal->y < 0) ? -1.0 : 1.0;
-        theta_sign_ = (goal->theta) ? -1.0 : 1.0;
+        theta_sign_ = (goal->theta < 0) ? -1.0 : 1.0;
 
 
         start_time_ = this->now();
