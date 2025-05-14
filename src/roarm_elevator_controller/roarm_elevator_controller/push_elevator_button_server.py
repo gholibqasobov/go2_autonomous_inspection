@@ -8,13 +8,15 @@ from roarm_moveit.srv import MovePointCmd
 from go2_interfaces.action import PushElevatorButton
 import time
 import numpy as np
+from scipy.spatial.transform import Rotation as R
+import math
 
 
 class ElevatorButtonPushActionServer(Node):
     # Offset dictionary for floor buttons
     ELEVATOR_BUTTON_OFFSETS = {  # offset from z-axis
-        101: 0.1,  # call elevator (up)
-        102: -0.1, # call elevator (down)
+        101: 0.4355,  # call elevator (up)
+        102: 0.477, # call elevator (down)
         -1: -0.1,
         0: 0.0,
         1: 0.1,
@@ -55,7 +57,9 @@ class ElevatorButtonPushActionServer(Node):
         self._goal_handle = None
         self._goal_canceled = False
         self._target_apriltag_frame = None
-        self._robot_home_pose = (0.4, 0.0, 0.2)
+        self._robot_home_pose = (0.3, 0.0, 0.3)
+        self._roll = 0.0
+        self._y_offset = 0.0
         
         # AprilTag pose subscriber
         self.subscription = self.create_subscription(
@@ -80,6 +84,16 @@ class ElevatorButtonPushActionServer(Node):
         
         self.get_logger().info('Elevator Button Push Action Server is ready')
 
+    def __quaternion_to_euler(self, qx, qy, qz, qw):
+        # Create a rotation object from quaternion
+        r = R.from_quat([qx, qy, qz, qw])
+        
+        # Convert to Euler angles (roll, pitch, yaw) in radians
+        roll, pitch, yaw = r.as_euler('xyz', degrees=False)
+        
+        print(f"Roll: {roll:.4f} radians, Pitch: {pitch:.4f} radians, Yaw: {yaw:.4f} radians")
+        return roll, pitch, yaw
+
     def apriltag_pose_callback(self, msg):
         """Callback to process TF messages and extract AprilTag pose"""
         for transform in msg.transforms:
@@ -89,6 +103,15 @@ class ElevatorButtonPushActionServer(Node):
                     transform.transform.translation.y, 
                     transform.transform.translation.z
                 ])
+
+                qx = transform.transform.rotation.x
+                qy = transform.transform.rotation.y
+                qz = transform.transform.rotation.z
+                qw = transform.transform.rotation.w
+
+                self._roll, pitch, yaw = self.__quaternion_to_euler(qx, qy, qz, qw)
+
+
                 
     def goal_callback(self, goal_request):
         """Called when a new goal is received"""
@@ -164,13 +187,16 @@ class ElevatorButtonPushActionServer(Node):
             
             x, y, z = robot_to_apriltag_coord
             button_offset = self.ELEVATOR_BUTTON_OFFSETS[floor_number]
-            x_offset = -0.1  # Approach offset
+            x_offset = 0.01  # Approach offset
+            self._y_offset = np.sin(self._roll) * 0.03
             
             # Define push sequence: approach, push, retract
             points = [
-                (x + x_offset, y, z + button_offset),  # Approach
-                (x, y, z + button_offset),             # Push
-                (x + x_offset, y, z + button_offset)   # Retract
+                (x, y, z + button_offset),  # Approach
+                (x + x_offset + 0.01, y, z + button_offset - 0.02),             # Push
+                (x + x_offset, y, z + button_offset),             # Approach
+                (x + x_offset + 0.01, y, z + button_offset - 0.02),             # Push
+                (x, y, z + button_offset)   # Retract
             ]
             
             # Execute movement sequence
@@ -242,6 +268,8 @@ class ElevatorButtonPushActionServer(Node):
             goal_handle.abort()
             
         return result
+
+    
 
 
 def main(args=None):
