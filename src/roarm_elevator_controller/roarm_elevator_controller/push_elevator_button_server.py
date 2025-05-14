@@ -187,15 +187,15 @@ class ElevatorButtonPushActionServer(Node):
             
             x, y, z = robot_to_apriltag_coord
             button_offset = self.ELEVATOR_BUTTON_OFFSETS[floor_number]
-            x_offset = 0.02  # Approach offset
+            x_offset = 0.01  # Approach offset
             self._y_offset = np.sin(self._roll) * 0.03
             
             # Define push sequence: approach, push, retract
             points = [
                 (x, y, z + button_offset),  # Approach
-                (x + x_offset + 0.01, y, z + button_offset - 0.03),             # Push
+                (x + x_offset + 0.01, y, z + button_offset - 0.02),             # Push
                 (x + x_offset, y, z + button_offset),             # Approach
-                (x + x_offset + 0.01, y, z + button_offset - 0.03),             # Push
+                (x + x_offset + 0.01, y, z + button_offset - 0.02),             # Push
                 (x, y, z + button_offset)   # Retract
             ]
             
