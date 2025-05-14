@@ -15,7 +15,7 @@ import math
 class ElevatorButtonPushActionServer(Node):
     # Offset dictionary for floor buttons
     ELEVATOR_BUTTON_OFFSETS = {  # offset from z-axis
-        101: 0.437,  # call elevator (up)
+        101: 0.4355,  # call elevator (up)
         102: 0.477, # call elevator (down)
         -1: -0.1,
         0: 0.0,
@@ -188,12 +188,14 @@ class ElevatorButtonPushActionServer(Node):
             x, y, z = robot_to_apriltag_coord
             button_offset = self.ELEVATOR_BUTTON_OFFSETS[floor_number]
             x_offset = 0.02  # Approach offset
-            self._y_offset = np.sin(self._roll) * 0.02
+            self._y_offset = np.sin(self._roll) * 0.03
             
             # Define push sequence: approach, push, retract
             points = [
                 (x, y, z + button_offset),  # Approach
-                (x + x_offset, y + self._y_offset, z + button_offset),             # Push
+                (x + x_offset + 0.01, y, z + button_offset - 0.03),             # Push
+                (x + x_offset, y, z + button_offset),             # Approach
+                (x + x_offset + 0.01, y, z + button_offset - 0.03),             # Push
                 (x, y, z + button_offset)   # Retract
             ]
             

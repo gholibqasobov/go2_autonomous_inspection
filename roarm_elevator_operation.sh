@@ -30,5 +30,8 @@ sleep 2
 
 echo "Starting Push-Button server"
 
+gnome-terminal -- bash -c "ros2 run roarm_elevator_controller move_point_client 0.3 0.0 0.3; exec bash"
 
-gnome-terminal -- bash -c "ros2 run roarm_elevator_controller push_elevator_button_server; exec bash"
+sleep 1
+#gnome-terminal -- bash -c "ros2 run roarm_elevator_controller push_elevator_button_server; exec bash"
+
