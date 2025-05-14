@@ -68,6 +68,7 @@ private:
     double disp_x_, disp_y_, disp_theta_;
 
     double x_duration_, y_duration_, theta_duration_;
+    double x_sign_, y_sign_, theta_sign_;
     
     std::shared_ptr<GoalHandleMoveToGoal> active_goal_handle_;
 
@@ -94,9 +95,15 @@ private:
         active_goal_handle_ = goal_handle;
         auto goal = goal_handle->get_goal();
 
-        x_duration_ = goal->x;
-        y_duration_ = goal->y;
-        theta_duration_ = goal->theta;
+        x_duration_ = std::abs(goal->x);
+        y_duration_ = std::abs(goal->y);
+        theta_duration_ = std::abs(goal->theta);
+
+        x_sign_ = (goal->x < 0) ? -1.0 : 1.0;
+        y_sign_ = (goal->y < 0) ? -1.0 : 1.0;
+        theta_sign_ = (goal->theta) ? -1.0 : 1.0;
+
+
         start_time_ = this->now();
 
         timer_ = this->create_wall_timer(
@@ -114,9 +121,9 @@ private:
         auto now = this->now();
         double elapsed = (now - start_time_).seconds();
 
-        float vx = (elapsed < x_duration_/disp_x_) ? x_vel_ : 0.0;
-        float vy = (elapsed < y_duration_/disp_y_) ? y_vel_ : 0.0;
-        float vtheta = (elapsed < theta_duration_/disp_theta_) ? theta_vel_ : 0.0;
+        float vx = (elapsed < x_duration_/disp_x_) ? x_vel_ * x_sign_ : 0.0;
+        float vy = (elapsed < y_duration_/disp_y_) ? y_vel_ * y_sign_ : 0.0;
+        float vtheta = (elapsed < theta_duration_/disp_theta_) ? theta_vel_ * theta_sign_ : 0.0;
 
         // Send feedback
         auto feedback = std::make_shared<MoveToGoal::Feedback>();
