@@ -47,8 +47,8 @@ add_executable(apriltag_docking_server src/apriltag_docking_server.cpp)
 ament_target_dependencies(apriltag_docking_server rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs tf2 go2_interfaces rclcpp_action)
 
 
-add_executable(aprilag_stop_server src/aprilag_stop_server.cpp)
-ament_target_dependencies(aprilag_stop_server rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs tf2 go2_interfaces rclcpp_action)
+add_executable(apriltag_stop_server src/apriltag_stop_server.cpp)
+ament_target_dependencies(apriltag_stop_server rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs tf2 go2_interfaces rclcpp_action)
 
 install(TARGETS
   talker
