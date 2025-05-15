@@ -23,6 +23,8 @@ setup(
         'console_scripts': [
             'damaged_object_tracker = camera_inspection.damaged_object_tracker:main',
             'damaged_objects_rviz_publisher = camera_inspection.damaged_objects_rviz_publisher:main',
+            'elevator_white_coefficient = camera_inspection.elevator_white_coefficient:main',
+            'elevator_red_coefficient = camera_inspection.elevator_red_coefficient:main',
         ],
     },
 )
