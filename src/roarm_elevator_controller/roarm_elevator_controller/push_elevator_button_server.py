@@ -15,10 +15,10 @@ import math
 class ElevatorButtonPushActionServer(Node):
     # Offset dictionary for floor buttons
     ELEVATOR_BUTTON_OFFSETS = {  # offset from z-axis
-        101: 0.4355,  # call elevator (up)
+        101: 0.4255,  # call elevator (up)
         102: 0.477, # call elevator (down)
         -1: -0.1,
-        0: 0.0,
+        0: -0.1,
         1: 0.1,
         2: 0.2,
         3: 0.3,
@@ -59,7 +59,10 @@ class ElevatorButtonPushActionServer(Node):
         self._target_apriltag_frame = None
         self._robot_home_pose = (0.3, 0.0, 0.3)
         self._roll = 0.0
+        self._x_offset = 0.0
         self._y_offset = 0.0
+        self._z_offset = 0.0
+        self._panel_offset = 0.04
         
         # AprilTag pose subscriber
         self.subscription = self.create_subscription(
@@ -187,16 +190,14 @@ class ElevatorButtonPushActionServer(Node):
             
             x, y, z = robot_to_apriltag_coord
             button_offset = self.ELEVATOR_BUTTON_OFFSETS[floor_number]
-            x_offset = 0.01  # Approach offset
-            self._y_offset = np.sin(self._roll) * 0.03
-            
+            x_offset = 0.02  # Approach offset
+            # self._y_offset = np.sin(self._roll) * 0.03
+            self._y_offset = 0.0055
             # Define push sequence: approach, push, retract
             points = [
-                (x, y, z + button_offset),  # Approach
-                (x + x_offset + 0.01, y, z + button_offset - 0.02),             # Push
-                (x + x_offset, y, z + button_offset),             # Approach
-                (x + x_offset + 0.01, y, z + button_offset - 0.02),             # Push
-                (x, y, z + button_offset)   # Retract
+                (x - self._panel_offset, y - self._y_offset, z + button_offset),  # Approach
+                (x + x_offset, y - self._y_offset, z + button_offset - 0.035),             # Push
+                (x - self._panel_offset, y - self._y_offset, z + button_offset)   # Retract
             ]
             
             # Execute movement sequence
@@ -234,7 +235,7 @@ class ElevatorButtonPushActionServer(Node):
                     return result
                 
                 # Add a small delay between movements
-                time.sleep(0.5)
+                time.sleep(0.7)
 
             # return to home position
             feedback_msg.current_state = 'RETURNING_TO_HOME'
