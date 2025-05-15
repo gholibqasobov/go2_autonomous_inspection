@@ -59,7 +59,7 @@ class ElevatorButtonPushActionServer(Node):
         self._target_apriltag_frame = None
         self._robot_home_pose = (0.3, 0.0, 0.3)
         self._roll = 0.0
-        self._x_offset = 0.0
+        self._x_offset = 0.05
         self._y_offset = 0.0
         self._z_offset = 0.0
         self._panel_offset = 0.04
@@ -190,14 +190,14 @@ class ElevatorButtonPushActionServer(Node):
             
             x, y, z = robot_to_apriltag_coord
             button_offset = self.ELEVATOR_BUTTON_OFFSETS[floor_number]
-            x_offset = 0.02  # Approach offset
+            button_press_offset = 0.02  # Approach offset
             # self._y_offset = np.sin(self._roll) * 0.03
             self._y_offset = 0.0055
             # Define push sequence: approach, push, retract
             points = [
-                (x - self._panel_offset, y - self._y_offset, z + button_offset),  # Approach
-                (x + x_offset, y - self._y_offset, z + button_offset - 0.035),             # Push
-                (x - self._panel_offset, y - self._y_offset, z + button_offset)   # Retract
+                (x - self._panel_offset - self._x_offset, y - self._y_offset, z + button_offset),  # Approach
+                (x + button_press_offset, y - self._y_offset, z + button_offset - 0.035),             # Push
+                (x - self._panel_offset - self._x_offset, y - self._y_offset, z + button_offset)   # Retract
             ]
             
             # Execute movement sequence
