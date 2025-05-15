@@ -46,6 +46,10 @@ ament_target_dependencies(move_robot_with_joy rclcpp std_msgs geometry_msgs unit
 add_executable(apriltag_docking_server src/apriltag_docking_server.cpp)
 ament_target_dependencies(apriltag_docking_server rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs tf2 go2_interfaces rclcpp_action)
 
+
+add_executable(aprilag_stop_server src/aprilag_stop_server.cpp)
+ament_target_dependencies(aprilag_stop_server rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs tf2 go2_interfaces rclcpp_action)
+
 install(TARGETS
   talker
   apriltag_docking
@@ -53,6 +57,7 @@ install(TARGETS
   apriltag_docking_controller
   move_robot_with_joy
   apriltag_docking_server
+  apriltag_stop_server
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
