@@ -15,10 +15,10 @@ import math
 class ElevatorButtonPushActionServer(Node):
     # Offset dictionary for floor buttons
     ELEVATOR_BUTTON_OFFSETS = {  # offset from z-axis
-        101: 0.4355,  # call elevator (up)
+        101: 0.4255,  # call elevator (up)
         102: 0.477, # call elevator (down)
         -1: -0.1,
-        0: 0.0,
+        0: -0.1,
         1: 0.1,
         2: 0.2,
         3: 0.3,
@@ -192,11 +192,11 @@ class ElevatorButtonPushActionServer(Node):
             
             # Define push sequence: approach, push, retract
             points = [
-                (x, y, z + button_offset),  # Approach
-                (x + x_offset + 0.01, y, z + button_offset - 0.02),             # Push
-                (x + x_offset, y, z + button_offset),             # Approach
-                (x + x_offset + 0.01, y, z + button_offset - 0.02),             # Push
-                (x, y, z + button_offset)   # Retract
+                (x - 0.04, y - 0.005, z + button_offset),  # Approach
+                (x + x_offset + 0.01, y - 0.0055, z + button_offset - 0.035),             # Push
+                # (x + x_offset, y, z + button_offset),             # Approach
+                # (x + x_offset + 0.01, y, z + button_offset - 0.02),             # Push
+                (x - 0.04, y - 0.005, z + button_offset)   # Retract
             ]
             
             # Execute movement sequence
@@ -234,7 +234,7 @@ class ElevatorButtonPushActionServer(Node):
                     return result
                 
                 # Add a small delay between movements
-                time.sleep(0.5)
+                time.sleep(0.7)
 
             # return to home position
             feedback_msg.current_state = 'RETURNING_TO_HOME'
