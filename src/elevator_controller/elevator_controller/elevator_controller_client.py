@@ -139,10 +139,10 @@ def main(args=None):
 
     # Define your sequence
     sequence = [
-        {'type': 'docking', 'apriltag_frame': 'elevator_panel'},
-        {'type': 'button', 'floor_number': 2, 'apriltag_frame': 'elevator_panel'},
+        {'type': 'docking', 'apriltag_frame': 'elevator_docking'},
+        {'type': 'button', 'floor_number': 2, 'apriltag_frame': 'elevator_docking'},
         {'type': 'move', 'x': 0, 'y': 0.3, 'theta': 0},
-        {'type': 'docking', 'apriltag_frame': 'elevator_panel'}
+        {'type': 'docking', 'apriltag_frame': 'elevator_docking'}
     ]
     node.run_sequence(sequence)
 
