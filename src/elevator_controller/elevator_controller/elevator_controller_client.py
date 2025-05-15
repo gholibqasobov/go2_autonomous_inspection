@@ -3,7 +3,7 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
-from go2_interfaces.action import AprilTagDocking, PushElevatorButton, MoveToGoal, AprilTagStop
+from go2_interfaces.action import AprilTagDocking, PushElevatorButton, MoveToGoal
 
 
 class ElevatorControllerClient(Node):
@@ -16,7 +16,7 @@ class ElevatorControllerClient(Node):
             'docking': ActionClient(self, AprilTagDocking, 'apriltag_docking', callback_group=callback_group),
             'button': ActionClient(self, PushElevatorButton, 'push_elevator_button', callback_group=callback_group),
             'move': ActionClient(self, MoveToGoal, 'move_to_goal', callback_group=callback_group),
-            'exit': ActionClient(self, AprilTagStop, 'apriltag_stop', callback_group=callback_group)
+            # 'exit': ActionClient(self, AprilTagStop, 'apriltag_stop', callback_group=callback_group)
         }
 
         self.get_logger().info('Elevator Controller Client initialized')
@@ -49,8 +49,8 @@ class ElevatorControllerClient(Node):
             self.send_button_push_goal(step['floor_number'], step['apriltag_frame'], self._step_done_cb)
         elif action_type == 'move':
             self.send_move_robot_goal(step.get('x', 0), step.get('y', 0), step.get('theta', 0), self._step_done_cb)
-        elif action_type == 'exit':
-            self.send_exit_goal(step['apriltag_frame'], step['forward_meters'], self._step_done_cb)
+        # elif action_type == 'exit':
+        #     self.send_exit_goal(step['apriltag_frame'], step['forward_meters'], self._step_done_cb)
         else:
             self.get_logger().error(f'Unknown step type: {action_type}')
             rclpy.shutdown()
@@ -130,26 +130,26 @@ class ElevatorControllerClient(Node):
 
 
     # Exit elevator client methods
-    def send_exit_goal(self, apriltag_frame, forward_meters, done_cb):
-        self.get_logger().info('Waiting for AprilTag Stop server...')
-        client = self._clients['button']
-        client.wait_for_server()
-        goal = AprilTagStop.Goal(apriltag_frame=apriltag_frame, forward_meters=forward_meters)
-        fut = client.send_goal_async(goal, feedback_callback=self._exit_feedback)
-        fut.add_done_callback(lambda f: self._on_exit_response(f, done_cb))
+    # def send_exit_goal(self, apriltag_frame, forward_meters, done_cb):
+    #     self.get_logger().info('Waiting for AprilTag Stop server...')
+    #     client = self._clients['button']
+    #     client.wait_for_server()
+    #     goal = AprilTagStop.Goal(apriltag_frame=apriltag_frame, forward_meters=forward_meters)
+    #     fut = client.send_goal_async(goal, feedback_callback=self._exit_feedback)
+    #     fut.add_done_callback(lambda f: self._on_exit_response(f, done_cb))
 
-    def _exit_feedback(self, feedback_msg):
-        fb = feedback_msg.feedback
-        self.get_logger().info(f'Move state: {fb.current_state}')
+    # def _exit_feedback(self, feedback_msg):
+    #     fb = feedback_msg.feedback
+    #     self.get_logger().info(f'Move state: {fb.current_state}')
     
-    def _on_exit_response(self, future, done_cb):
-        handle = future.result()
-        if not handle.accepted:
-            self.get_logger().info('Exit rejected')
-            done_cb(False)
-            return
-        res_fut = handle.get_result_async()
-        res_fut.add_done_callback(lambda f: done_cb(f.result().status == 4))
+    # def _on_exit_response(self, future, done_cb):
+    #     handle = future.result()
+    #     if not handle.accepted:
+    #         self.get_logger().info('Exit rejected')
+    #         done_cb(False)
+    #         return
+    #     res_fut = handle.get_result_async()
+    #     res_fut.add_done_callback(lambda f: done_cb(f.result().status == 4))
     
 
     def cancel_all_goals(self):
@@ -173,7 +173,7 @@ def main(args=None):
         {'type': 'move', 'x': 0.0, 'y': 0.0, 'theta': 90}, # theta in degrees
         {'type': 'button', 'floor_number': 2, 'apriltag_frame': 'elevator_docking'},
         {'type': 'move', 'x': 0.0, 'y': 0.0, 'theta': 90}, # theta in degrees
-        {'type': 'exit', 'apriltag_frame': 'elevator_docking', 'forward_meters': 1.5}, 
+        # {'type': 'exit', 'apriltag_frame': 'elevator_docking', 'forward_meters': 1.5}, 
 
     ]
     node.run_sequence(sequence)
