@@ -12,7 +12,7 @@ class ElevatorControllerClient(Node):
         callback_group = ReentrantCallbackGroup()
 
         # Action clients
-        self._clients = {
+        self._action_clients = {  # Renamed from _clients to _action_clients
             'docking': ActionClient(self, AprilTagDocking, 'apriltag_docking', callback_group=callback_group),
             'button': ActionClient(self, PushElevatorButton, 'push_elevator_button', callback_group=callback_group),
             'move': ActionClient(self, MoveToGoal, 'move_to_goal', callback_group=callback_group)
@@ -64,7 +64,7 @@ class ElevatorControllerClient(Node):
     # -- action wrappers with callback on completion --
     def send_docking_goal(self, apriltag_frame, done_cb):
         self.get_logger().info('Waiting for Docking server...')
-        client = self._clients['docking']
+        client = self._action_clients['docking']  # Updated reference
         client.wait_for_server()
         goal = AprilTagDocking.Goal(apriltag_frame=apriltag_frame)
         fut = client.send_goal_async(goal, feedback_callback=self._docking_feedback)
@@ -85,7 +85,7 @@ class ElevatorControllerClient(Node):
 
     def send_button_push_goal(self, floor_number, apriltag_frame, done_cb):
         self.get_logger().info('Waiting for Button Push server...')
-        client = self._clients['button']
+        client = self._action_clients['button']  # Updated reference
         client.wait_for_server()
         goal = PushElevatorButton.Goal(floor_number=floor_number, apriltag_frame=apriltag_frame)
         fut = client.send_goal_async(goal, feedback_callback=self._button_feedback)
@@ -106,7 +106,7 @@ class ElevatorControllerClient(Node):
 
     def send_move_robot_goal(self, x, y, theta, done_cb):
         self.get_logger().info('Waiting for Move Robot server...')
-        client = self._clients['move']
+        client = self._action_clients['move']  # Updated reference
         client.wait_for_server()
         goal = MoveToGoal.Goal(x=float(x), y=float(y), theta=float(theta))
         fut = client.send_goal_async(goal, feedback_callback=self._move_feedback)
@@ -127,7 +127,7 @@ class ElevatorControllerClient(Node):
 
     def cancel_all_goals(self):
         self.get_logger().info('Canceling all active goals...')
-        for client in self._clients.values():
+        for client in self._action_clients.values():  # Updated reference
             client.cancel_all_goals()
 
 

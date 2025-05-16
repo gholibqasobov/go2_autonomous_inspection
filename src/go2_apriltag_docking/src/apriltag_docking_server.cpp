@@ -306,7 +306,7 @@ private:
       RCLCPP_INFO(this->get_logger(), "Searching for AprilTag... [lin_vel: 0.00, rot_vel: 0.00]");
       
       // If we've been searching too long, abort the goal
-      if ((this->now() - last_detection_time_).seconds() > tag_timeout_ * 10.0) {
+      if ((this->now() - last_detection_time_).seconds() > tag_timeout_ * 100.0) {
         RCLCPP_ERROR(this->get_logger(), "Could not find the specified AprilTag after extended search. Aborting.");
         completeGoal(false);
         return;
