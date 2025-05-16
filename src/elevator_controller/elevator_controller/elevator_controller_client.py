@@ -3,7 +3,7 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
-from go2_interfaces.action import AprilTagDocking, PushElevatorButton, MoveToGoal
+from go2_interfaces.action import AprilTagDocking, PushElevatorButton, MoveToGoal, AprilTagStop
 
 
 class ElevatorControllerClient(Node):
@@ -15,7 +15,8 @@ class ElevatorControllerClient(Node):
         self._action_clients = {  # Renamed from _clients to _action_clients
             'docking': ActionClient(self, AprilTagDocking, 'apriltag_docking', callback_group=callback_group),
             'button': ActionClient(self, PushElevatorButton, 'push_elevator_button', callback_group=callback_group),
-            'move': ActionClient(self, MoveToGoal, 'move_to_goal', callback_group=callback_group)
+            'move': ActionClient(self, MoveToGoal, 'move_to_goal', callback_group=callback_group),
+            'exit': ActionClient(self, AprilTagStop, 'apriltag_stop', callback_group=callback_group)
         }
 
         self.get_logger().info('Elevator Controller Client initialized')
@@ -26,7 +27,7 @@ class ElevatorControllerClient(Node):
     def run_sequence(self, steps):
         """
         Run a list of sequential actions. Each step is a dict with 'type' and its params.
-        Supported types: 'docking', 'button', 'move'.
+        Supported types: 'docking', 'button', 'move', 'exit'.
         """
         self._sequence = steps
         self._current_step = 0
@@ -48,6 +49,8 @@ class ElevatorControllerClient(Node):
             self.send_button_push_goal(step['floor_number'], step['apriltag_frame'], self._step_done_cb)
         elif action_type == 'move':
             self.send_move_robot_goal(step.get('x', 0), step.get('y', 0), step.get('theta', 0), self._step_done_cb)
+        elif action_type == 'exit':
+            self.send_exit_goal(step['apriltag_frame'], step['forward_meters'], self._step_done_cb)
         else:
             self.get_logger().error(f'Unknown step type: {action_type}')
             rclpy.shutdown()
@@ -125,6 +128,31 @@ class ElevatorControllerClient(Node):
         fb = feedback_msg.feedback
         self.get_logger().info(f'Move state: {fb.current_state}')
 
+
+
+    """Exit Elevator Methods"""
+    def send_exit_goal(self, apriltag_frame, forward_meters, done_cb):
+        self.get_logger().info('Waiting for Elevator Exit server...')
+        client = self._action_clients['exit']  # Updated reference
+        client.wait_for_server()
+        goal = AprilTagStop.Goal(apriltag_frame=apriltag_frame, forward_meters=float(forward_meters))
+        fut = client.send_goal_async(goal, feedback_callback=self._exit_feedback)
+        fut.add_done_callback(lambda f: self._on_exit_response(f, done_cb))
+
+    def _on_exit_response(self, future, done_cb):
+        handle = future.result()
+        if not handle.accepted:
+            self.get_logger().info('Exit move rejected')
+            done_cb(False)
+            return
+        res_fut = handle.get_result_async()
+        res_fut.add_done_callback(lambda f: done_cb(f.result().status == 4))
+
+    def _exit_feedback(self, feedback_msg):
+        fb = feedback_msg.feedback
+        self.get_logger().info(f'Elevator Exit state: {fb.current_state}')
+
+
     def cancel_all_goals(self):
         self.get_logger().info('Canceling all active goals...')
         for client in self._action_clients.values():  # Updated reference
@@ -140,9 +168,14 @@ def main(args=None):
     # Define your sequence
     sequence = [
         {'type': 'docking', 'apriltag_frame': 'elevator_docking'},
-        {'type': 'button', 'floor_number': 2, 'apriltag_frame': 'elevator_docking'},
-        {'type': 'move', 'x': 0, 'y': 0.3, 'theta': 0},
-        {'type': 'docking', 'apriltag_frame': 'elevator_docking'}
+        {'type': 'button', 'floor_number': 101, 'apriltag_frame': 'elevator_docking'},
+        # {'type': 'move', 'x': 0, 'y': 0.3, 'theta': 0},
+        # {'type': 'docking', 'apriltag_frame': 'elevator_docking'},
+        # {'type': 'move', 'x': 0, 'y': 0.0, 'theta': 0},
+        # {'type': 'button', 'floor_number': 2, 'apriltag_frame': 'elevator_docking'},
+        # {'type': 'move', 'x': 0, 'y': 0.3, 'theta': 0},
+        # {'type': 'exit', 'apriltag_frame': 'elevator_docking', 'forward_meters': 2.0},
+        
     ]
     node.run_sequence(sequence)
 
