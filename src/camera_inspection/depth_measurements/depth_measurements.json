@@ -1,0 +1,36 @@
+[
+  {
+    "id": "1",
+    "class_name": "half_working_light",
+    "image_file": "depth_measurement_1_20250516_145419.jpg",
+    "timestamp": 1747389258.5931797,
+    "bbox": {
+      "x1": 718,
+      "y1": 1,
+      "x2": 981,
+      "y2": 297
+    },
+    "camera_frame_position": {
+      "x": 0.964458536585366,
+      "y": -0.5619365853658537,
+      "z": 2.451
+    }
+  },
+  {
+    "id": "2",
+    "class_name": "light_on",
+    "image_file": "depth_measurement_2_20250516_145419.jpg",
+    "timestamp": 1747389258.5931797,
+    "bbox": {
+      "x1": 781,
+      "y1": 253,
+      "x2": 1046,
+      "y2": 662
+    },
+    "camera_frame_position": {
+      "x": 1.2117333333333333,
+      "y": 0.2730666666666667,
+      "z": 2.624
+    }
+  }
+]

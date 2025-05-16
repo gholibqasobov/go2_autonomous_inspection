@@ -14,3 +14,5 @@ colcon build --packages-select camera_inspection
 
 source install/setup.bash
 
+
+ros2 launch realsense2_camera rs_launch.py

@@ -25,6 +25,7 @@ setup(
             'damaged_objects_rviz_publisher = camera_inspection.damaged_objects_rviz_publisher:main',
             'elevator_white_coefficient = camera_inspection.elevator_white_coefficient:main',
             'elevator_red_coefficient = camera_inspection.elevator_red_coefficient:main',
+            'depth_measurement_tracker = camera_inspection.depth_measurement_tracker:main',
         ],
     },
 )
