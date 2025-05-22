@@ -15,7 +15,7 @@ import math
 class ElevatorButtonPushActionServer(Node):
     # Offset dictionary for floor buttons
     ELEVATOR_BUTTON_OFFSETS = {  # offset from z-axis
-        101: 0.4255,  # call elevator (up)
+        101: 0.41,  # call elevator (up) (default val: 0.4255)
         102: 0.477, # call elevator (down)
         -1: -0.1,
         0: -0.1,
@@ -57,12 +57,12 @@ class ElevatorButtonPushActionServer(Node):
         self._goal_handle = None
         self._goal_canceled = False
         self._target_apriltag_frame = None
-        self._robot_home_pose = (0.3, 0.0, 0.3)
+        self._robot_home_pose = (0.15, 0.0, 0.4)
         self._roll = 0.0
-        self._x_offset = 0.05
+        self._x_offset = 0.00
         self._y_offset = 0.0
         self._z_offset = 0.0
-        self._panel_offset = 0.04
+        self._panel_offset = 0.05
         
         # AprilTag pose subscriber
         self.subscription = self.create_subscription(
@@ -190,14 +190,14 @@ class ElevatorButtonPushActionServer(Node):
             
             x, y, z = robot_to_apriltag_coord
             button_offset = self.ELEVATOR_BUTTON_OFFSETS[floor_number]
-            button_press_offset = 0.02  # Approach offset
+            button_press_offset = 0.00  # Approach offset
             # self._y_offset = np.sin(self._roll) * 0.03
             self._y_offset = 0.0055
             # Define push sequence: approach, push, retract
             points = [
-                (x - self._panel_offset - self._x_offset, y - self._y_offset, z + button_offset),  # Approach
-                (x + button_press_offset, y - self._y_offset, z + button_offset - 0.035),             # Push
-                (x - self._panel_offset - self._x_offset, y - self._y_offset, z + button_offset)   # Retract
+                (x - self._panel_offset, y, z + button_offset),  # Approach
+                (x + button_press_offset, y, z + button_offset - 0.035),             # Push
+                (x - self._panel_offset, y, z + button_offset)   # Retract
             ]
             
             # Execute movement sequence
