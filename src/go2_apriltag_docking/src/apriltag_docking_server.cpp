@@ -58,7 +58,7 @@ public:
     this->declare_parameter("max_forward_speed", 0.3);
     this->declare_parameter("max_angular_speed", 0.5);
     this->declare_parameter("center_threshold", 0.05);  // Threshold for considering tag centered
-    this->declare_parameter("final_threshold", 0.35);   // Final docking distance
+    this->declare_parameter("final_threshold", 0.30);   // Final docking distance
     this->declare_parameter("final_yaw_threshold", 0.05); // Final yaw alignment threshold (radians)
     this->declare_parameter("tag_timeout", 1.0);        // Seconds to consider tag lost
     
