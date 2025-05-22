@@ -169,12 +169,12 @@ def main(args=None):
     sequence = [
         {'type': 'docking', 'apriltag_frame': 'elevator_docking'},
         {'type': 'button', 'floor_number': 101, 'apriltag_frame': 'elevator_docking'},
-        # {'type': 'move', 'x': 0, 'y': 0.3, 'theta': 0},
-        # {'type': 'docking', 'apriltag_frame': 'elevator_docking'},
-        # {'type': 'move', 'x': 0, 'y': 0.0, 'theta': 0},
+        {'type': 'move', 'x': 0, 'y': 0.5, 'theta': 0},
+        {'type': 'docking', 'apriltag_frame': 'elevator_docking'},
+        # {'type': 'move', 'x': 0, 'y': 0.0, 'theta': 90}, # rotate to inner elevator panel
         # {'type': 'button', 'floor_number': 2, 'apriltag_frame': 'elevator_docking'},
-        # {'type': 'move', 'x': 0, 'y': 0.3, 'theta': 0},
-        # {'type': 'exit', 'apriltag_frame': 'elevator_docking', 'forward_meters': 2.0},
+        # {'type': 'move', 'x': 0, 'y': 0.3, 'theta': 90}, # rotate to the elevator door
+        # {'type': 'exit', 'apriltag_frame': 'elevator_docking', 'forward_meters': 1.5}, # exit elevator
         
     ]
     node.run_sequence(sequence)
