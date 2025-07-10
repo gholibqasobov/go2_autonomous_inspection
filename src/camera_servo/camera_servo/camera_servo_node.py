@@ -30,11 +30,12 @@ class ServoBridgeNode(Node):
 
     def move_callback(self, msg: String):
         try:
-            json_obj = json.loads(msg.data)  # Validate it's JSON
-            self.ser.write((json.dumps(json_obj) + '\n').encode())
-            self.get_logger().info(f"Sent to serial: {json_obj}")
-        except json.JSONDecodeError:
-            self.get_logger().error("Received invalid JSON for servo_move")
+            #json_obj = json.loads(msg.data)  # Validate it's JSON
+            serial_data = msg.data + '\n'
+            self.ser.write(serial_data.encode())
+            self.get_logger().info(f"Sent to serial: {msg}")
+        except Exception as e:
+            self.get_logger().error(e)
 
     def read_from_serial(self):
         while rclpy.ok():

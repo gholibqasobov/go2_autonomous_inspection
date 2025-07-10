@@ -10,52 +10,12 @@ Camera is attached to the 2 DOF manipulator consisting of 2 ST3215 Servos, conne
 - From the Board manager choose **ESP32 Dev Module**
 - Select your port and upload the code.
 
-## micro_ros_agent installation
-- source your ROS2 installation
+## Run the node
 
-    `source /opt/ros/$ROS_DISTRO/setup.bash`
-- create workspace
-    
-    `mkdir microros_ws`
+```ros2 run camera_servo camera_servo_node```
 
-    `cd microros_ws`
-- clone micro-ros tools
-
-    `git clone -b $ROS_DISTRO https://github.com/micro-ROS/micro_ros_setup.git src/micro_ros_setup`
-- Update dependencies using rosdep
-
-    `sudo apt update && rosdep update`
-
-    `rosdep install --from-paths src --ignore-src -y`
-
-- Build micro-ROS tools and source them
-
-    `colcon build`
-
-    `source install/local_setup.bash`
-
-- Download micro-ROS-Agent packages
-
-    `ros2 run micro_ros_setup create_agent_ws.sh`
-- Build agent
-
-    `ros2 run micro_ros_setup build_agent.sh`
-
-    `source install/local_setup.bash`
 
 ## Send comands to manipulator through the ROS2 topic
 
-- Disconnect manipulator's ESP32 from the PC
-- Close Serial monitor and programms that use your port if there are such 
-- Move to the workspace 
+ ```ros2 topic pub /servo_move std_msgs/msg/String '{ "data":"1500 1500"}'```
 
-    `cd microros_ws`
-
-- Source ROS2 setup and micro-ros workspace 
-
-    `source /opt/ros/$ROS_DISTRO/setup.bash`
-
-    `source /opt/ros/$ROS_DISTRO/setup.bash`
-
-- Run micro-ros agent
-`    ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 -b 115200`
