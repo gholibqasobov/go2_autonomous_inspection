@@ -1,10 +1,12 @@
 [
   {
     "id": "1",
+    "class_id": 1,
+    "class_name": "half_working_light",
     "image_file": "object_1_20250419_181934.jpg",
     "robot_position": {
       "x": 0.0,
-      "y": 0.0,
+      "y": 0.3,
       "z": 0.3659999966621399
     },
     "timestamp": 1745068773.9281752,
@@ -17,9 +19,11 @@
   },
   {
     "id": "2",
+    "class_id": 2,
+    "class_name": "light_on",
     "image_file": "object_2_20250419_181934.jpg",
     "robot_position": {
-      "x": 0.0,
+      "x": 2.0,
       "y": 0.0,
       "z": 0.3659999966621399
     },
