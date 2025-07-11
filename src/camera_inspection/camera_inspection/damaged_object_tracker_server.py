@@ -3,7 +3,8 @@ from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from tf2_msgs.msg import TFMessage
-from sensor_msgs.msg import Image, JointState
+from sensor_msgs.msg import Image
+from std_msgs.msg import String
 from cv_bridge import CvBridge
 from ultralytics import YOLO
 import cv2
@@ -192,8 +193,8 @@ class DamagedObjectTrackerServer(Node):
         )
         
         self.servo_sub = self.create_subscription(
-            JointState,
-            '/joint_states',
+            String,
+            '/servo_angles',
             self.servo_callback,
             10,
             callback_group=self.callback_group
@@ -269,16 +270,24 @@ class DamagedObjectTrackerServer(Node):
             self.get_logger().error(f"Error processing depth image: {str(e)}")
     
     def servo_callback(self, msg):
-        """Store the servo angles from joint states"""
+        """Store the servo angles from camera_servo package"""
         if not self.inspection_active:
             return
             
         try:
-            for i, name in enumerate(msg.name):
-                if 'pan' in name.lower():
-                    self.servo_angles['pan'] = msg.position[i]
-                elif 'tilt' in name.lower():
-                    self.servo_angles['tilt'] = msg.position[i]
+            # Parse servo angles from string format "1000 2007"
+            angles = msg.data.strip().split()
+            if len(angles) >= 2:
+                # Convert servo values to radians
+                # 2000 = 0 degrees, 1000 = 90 degrees, 3000 = -90 degrees
+                tilt_servo = int(angles[0])  # vertical axis (up/down)
+                pan_servo = int(angles[1])   # horizontal axis (left/right)
+                
+                # Convert to radians: (servo_value - 2000) * (pi/2) / 1000
+                self.servo_angles['tilt'] = (tilt_servo - 2000) * math.pi / 2000
+                self.servo_angles['pan'] = (pan_servo - 2000) * math.pi / 2000
+                
+                self.get_logger().debug(f"Servo angles - Tilt: {self.servo_angles['tilt']:.2f}rad, Pan: {self.servo_angles['pan']:.2f}rad")
         except Exception as e:
             self.get_logger().error(f"Error processing servo angles: {str(e)}")
     
