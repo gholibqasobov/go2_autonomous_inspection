@@ -106,7 +106,7 @@ class WaypointFollowerServer(Node):
                 servo_msg = String()
                 servo_msg.data = direction
                 self.servo_publisher_.publish(servo_msg)
-                time.sleep(2.0)
+                time.sleep(4.0)
             
             # time.sleep(2.0)
 
