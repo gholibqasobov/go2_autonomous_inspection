@@ -3,7 +3,7 @@ from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.executors import MultiThreadedExecutor
-
+from std_msgs.msg import String
 from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import Joy
 import yaml
@@ -32,10 +32,18 @@ class WaypointFollowerServer(Node):
         self.goal_pub = self.create_publisher(PointStamped, 'way_point', 10)
         self.joy_pub = self.create_publisher(Joy, 'joy', 10)
 
+        # Publisher for Servo
+        self.servo_publisher_ = self.create_publisher(String, '/servo_move', 10)
+
+
+
         self.goals = []
         self.goal_index = 0
         self._goal_handle = None
         self._goal_canceled = False
+
+        self.home_pose = '{ "data":"2000 2000"}'
+        self.servo_angles = [self.home_pose, '{ "data":"2000 3000"}', '{ "data":"2000 1000"}']
 
     def goal_callback(self, goal_request):
         self.get_logger().info(f"Received goal request: {goal_request.waypoint_file}")
@@ -93,7 +101,13 @@ class WaypointFollowerServer(Node):
 
             self.goal_index += 1
             # await rclpy.task.sleep(7.0)
-            time.sleep(7.0)
+            time.sleep(10.0)
+            for direction in self.servo_angles:
+                servo_msg = String()
+                servo_msg.data = direction
+                self.servo_publisher_.publish(servo_msg)
+                time.sleep(2.0)
+            # time.sleep(2.0)
 
         self.get_logger().info("All goals sent successfully")
         result.success = True
