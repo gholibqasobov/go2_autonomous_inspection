@@ -43,7 +43,7 @@ class WaypointFollowerServer(Node):
         self._goal_canceled = False
 
         self.home_pose = '{ "data":"2000 2000"}'
-        self.servo_angles = [self.home_pose, '{ "data":"2000 3000"}', '{ "data":"2000 1000"}']
+        self.servo_angles = [self.home_pose, '{ "data":"2000 3000"}', '{ "data":"2000 1000"}', self.home_pose]
 
     def goal_callback(self, goal_request):
         self.get_logger().info(f"Received goal request: {goal_request.waypoint_file}")
@@ -107,6 +107,7 @@ class WaypointFollowerServer(Node):
                 servo_msg.data = direction
                 self.servo_publisher_.publish(servo_msg)
                 time.sleep(2.0)
+            
             # time.sleep(2.0)
 
         self.get_logger().info("All goals sent successfully")
