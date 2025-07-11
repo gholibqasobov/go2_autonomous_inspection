@@ -56,7 +56,7 @@ class WaypointFollowerServer(Node):
         # Relative Path: src/go2_waypoint_nav/navigation_path/test_waypoint.yaml
 
         try:
-            with open(f'~/go2_autonomous_inspection/src/go2_waypoint_nav/navigation_path/{filename}', 'r') as file:
+            with open(f'/home/qasob/go2_autonomous_inspection/src/go2_waypoint_nav/navigation_path/{filename}', 'r') as file:
                 data = yaml.safe_load(file)
                 self.goals = data.get('waypoints', [])
         except Exception as e:
