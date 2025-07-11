@@ -5,7 +5,7 @@ import serial
 import threading
 import json
 
-SERIAL_PORT = '/dev/ttyUSB1'
+SERIAL_PORT = '/dev/ttyUSB0'
 BAUD_RATE = 115200
 
 class ServoBridgeNode(Node):
