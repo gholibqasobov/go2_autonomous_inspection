@@ -64,7 +64,7 @@ class WaypointFollowerServer(Node):
         # Relative Path: src/go2_waypoint_nav/navigation_path/test_waypoint.yaml
 
         try:
-            with open(f'/home/qasob/go2_autonomous_inspection/src/go2_waypoint_nav/navigation_path/{filename}', 'r') as file:
+            with open(f'/home/dog/go2_autonomous_inspection/src/go2_waypoint_nav/navigation_path/{filename}', 'r') as file:
                 data = yaml.safe_load(file)
                 self.goals = data.get('waypoints', [])
         except Exception as e:
@@ -101,12 +101,16 @@ class WaypointFollowerServer(Node):
 
             self.goal_index += 1
             # await rclpy.task.sleep(7.0)
-            time.sleep(10.0)
+            time.sleep(15.0)
+            servo_msg = String()
             for direction in self.servo_angles:
-                servo_msg = String()
-                servo_msg.data = direction
-                self.servo_publisher_.publish(servo_msg)
-                time.sleep(4.0)
+                start_time = time.time()
+                while time.time() - start_time < 4.0:
+                    servo_msg.data = direction
+                    self.servo_publisher_.publish(servo_msg)
+                    self.get_logger().info(f"Publishing: {direction}")
+                    time.sleep(0.2)
+                time.sleep(5)
             
             # time.sleep(2.0)
 
