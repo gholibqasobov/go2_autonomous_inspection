@@ -225,10 +225,20 @@ class DamagedObjectTrackerServer(Node):
         """Initialize the saved positions dictionary from loaded object data"""
         for obj in self.objects_data:
             class_name = obj.get('class_name')
-            if class_name and 'position' in obj:
+            position = None
+            
+            # Handle new format (world_position + transformation_success)
+            if 'world_position' in obj and obj.get('transformation_success', False):
+                if obj['world_position'] is not None:
+                    pos = obj['world_position']
+                    position = (pos['x'], pos['y'], pos['z'])
+            # Handle old format (position field)
+            elif 'position' in obj:
                 pos = obj['position']
                 position = (pos['x'], pos['y'], pos['z'])
-                
+            # Skip records with only robot_position (no world coordinates)
+            
+            if class_name and position:
                 if class_name not in self.saved_object_positions:
                     self.saved_object_positions[class_name] = []
                     
@@ -539,19 +549,24 @@ class DamagedObjectTrackerServer(Node):
                 }
             }
             
+            # Always save both robot position and world position
+            object_data['robot_position'] = {
+                'x': obj['robot_position'][0],
+                'y': obj['robot_position'][1],
+                'z': obj['robot_position'][2]
+            }
+            
             if object_position:
                 x, y, z = object_position
-                object_data['position'] = {
+                object_data['world_position'] = {
                     'x': x,
                     'y': y,
                     'z': z
                 }
+                object_data['transformation_success'] = True
             else:
-                object_data['robot_position'] = {
-                    'x': obj['robot_position'][0],
-                    'y': obj['robot_position'][1],
-                    'z': obj['robot_position'][2]
-                }
+                object_data['world_position'] = None
+                object_data['transformation_success'] = False
             
             self.objects_data.append(object_data)
             self.get_logger().info(f"Saved object ID {obj_id} to {img_path}")
