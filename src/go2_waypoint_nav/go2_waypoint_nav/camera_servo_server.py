@@ -1,55 +1,121 @@
-import sys
 import rclpy
 from rclpy.node import Node
-
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
+import time
 from std_msgs.msg import String
 
+from go2_interfaces.action import RotateCameraServo  # Your custom action
 
-class CameraServoPublisher(Node):
+class CameraServoActionServer(Node):
 
-    def __init__(self, x:str, y:str):
-        super().__init__('camera_servo_publisher')
+    def __init__(self):
+        super().__init__('camera_servo_action_server')
+        
+        # Action server
+        self._action_server = ActionServer(
+            self,
+            RotateCameraServo,
+            'camera_servo_action',
+            self.execute_callback,
+            goal_callback=self.goal_callback,
+            cancel_callback=self.cancel_callback
+        )
+
+        # Publisher for servo commands
         self.publisher_ = self.create_publisher(String, '/servo_move', 10)
-        timer_period = 1.5  # seconds
-        self.timer = self.create_timer(timer_period, self.servo_callback)
 
-        self.x = x
-        self.y = y
+        # Servo positions
+        self.home_pose = "2000 2000"
+        self.directions = ["2000 1500", "2000 3000", "1500 1500"]
+        
+        self._goal_handle = None
+        self._goal_canceled = False
 
-    def servo_callback(self):
+    def goal_callback(self, goal_request):
+        self.get_logger().info(f"Received goal request: start={goal_request.start}")
+        if not goal_request.start:
+            self.get_logger().info("Rejected goal - start must be true")
+            return GoalResponse.REJECT
+        return GoalResponse.ACCEPT
+
+    def cancel_callback(self, goal_handle):
+        self.get_logger().info("Received cancel request")
+        self._goal_canceled = True
+        return CancelResponse.ACCEPT
+
+    async def execute_callback(self, goal_handle):
+        self._goal_handle = goal_handle
+        self._goal_canceled = False
+
+        result = RotateCameraServo.Result()
+
+        if not goal_handle.request.start:
+            result.success = False
+            goal_handle.abort()
+            return result
+
+        # First move to home pose
+        self._publish_servo_command(self.home_pose)
+        feedback_msg = RotateCameraServo.Feedback()
+        feedback_msg.current_direction = "home"
+        goal_handle.publish_feedback(feedback_msg)
+        self._sleep_with_cancel_check(2.0)
+
+        if self._goal_canceled:
+            result.success = False
+            goal_handle.canceled()
+            return result
+
+        # Move through each direction
+        for direction in self.directions:
+            self._publish_servo_command(direction)
+            feedback_msg.current_direction = direction
+            goal_handle.publish_feedback(feedback_msg)
+            self._sleep_with_cancel_check(2.0)
+
+            if self._goal_canceled:
+                result.success = False
+                goal_handle.canceled()
+                return result
+
+        # Return to home pose
+        self._publish_servo_command(self.home_pose)
+        feedback_msg.current_direction = "home"
+        goal_handle.publish_feedback(feedback_msg)
+        self._sleep_with_cancel_check(2.0)
+
+        # Complete the action
+        result.success = True
+        goal_handle.succeed()
+        return result
+
+    def _publish_servo_command(self, command):
         msg = String()
-        msg.data = f"{self.x} {self.y}"
-
+        msg.data = command
         self.publisher_.publish(msg)
-        self.get_logger().info(f"Publishing: {self.x}, {self.y}")
+        self.get_logger().info(f"Published servo command: {command}")
+
+    def _sleep_with_cancel_check(self, duration):
+        """Sleep for duration but check for cancel periodically"""
+        sleep_interval = 0.1
+        remaining = duration
+        while remaining > 0 and not self._goal_canceled:
+            time.sleep(min(sleep_interval, remaining))
+            remaining -= sleep_interval
 
 
 def main(args=None):
     rclpy.init(args=args)
-    
-    if len(sys.argv) < 3:
-        print("Usage: ros2 run <package> <executable> <x> <y>")
-        return
+    server = CameraServoActionServer()
 
-    x, y = str(sys.argv[1]), str(sys.argv[2])
-   
-
-    minimal_publisher = CameraServoPublisher(x, y)
-
-    rclpy.spin(minimal_publisher)
-
-    minimal_publisher.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(server)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':
     main()
-
-
-'''
-
-[INFO] [1752313503.557251719] [camera_servo_node]: Sent to serial: std_msgs.msg.String(data='1500 1500')
-[INFO] [1752313468.483084429] [camera_servo_node]: Sent to serial: std_msgs.msg.String(data='{"data": "1500 1500"}')
-
-[INFO] [1752313629.038020907] [camera_servo_node]: Sent to serial: std_msgs.msg.String(data='2000 2000')
-'''
