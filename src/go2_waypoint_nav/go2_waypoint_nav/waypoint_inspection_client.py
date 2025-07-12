@@ -3,7 +3,7 @@ from rclpy.action import ActionClient
 from rclpy.node import Node
 import yaml
 from geometry_msgs.msg import PointStamped
-from go2_interfaces.action import WaypointFollower
+from go2_interfaces.action import WaypointFollower, RotateCameraServo
 import os
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
@@ -15,12 +15,23 @@ class WaypointFollowerClient(Node):
     def __init__(self):
         super().__init__('waypoint_follower_client')
         self.callback_group = ReentrantCallbackGroup()
-        self._action_client = ActionClient(
+        
+        # Waypoint follower action client
+        self._waypoint_action_client = ActionClient(
             self, 
             WaypointFollower, 
             'waypoint_follower',
             callback_group=self.callback_group
         )
+        
+        # Camera servo action client
+        self._camera_servo_client = ActionClient(
+            self,
+            RotateCameraServo,
+            'camera_servo_action',
+            callback_group=self.callback_group
+        )
+        
         self.current_goal_handle = None
         self.waypoints = []
         self.current_waypoint_index = 0
@@ -80,40 +91,93 @@ class WaypointFollowerClient(Node):
         goal_msg.waypoint = waypoint
 
         # Wait for action server
-        self._action_client.wait_for_server()
+        self._waypoint_action_client.wait_for_server()
 
         # Send goal
-        self._send_goal_future = self._action_client.send_goal_async(
+        self._send_goal_future = self._waypoint_action_client.send_goal_async(
             goal_msg,
             feedback_callback=self.feedback_callback
         )
-        self._send_goal_future.add_done_callback(self.goal_response_callback)
+        self._send_goal_future.add_done_callback(self.waypoint_goal_response_callback)
 
-    def goal_response_callback(self, future):
-        """Handle the response from the action server"""
+    def waypoint_goal_response_callback(self, future):
+        """Handle the response from the waypoint action server"""
         self.current_goal_handle = future.result()
         if not self.current_goal_handle.accepted:
-            self.get_logger().info('Goal rejected :(')
+            self.get_logger().info('Waypoint goal rejected :(')
             return
 
-        self.get_logger().info('Goal accepted :)')
+        self.get_logger().info('Waypoint goal accepted :)')
 
         self._get_result_future = self.current_goal_handle.get_result_async()
-        self._get_result_future.add_done_callback(self.get_result_callback)
+        self._get_result_future.add_done_callback(self.waypoint_result_callback)
 
-    def get_result_callback(self, future):
-        """Handle the result from the action server"""
+    def waypoint_result_callback(self, future):
+        """Handle the result from the waypoint action server"""
         result = future.result().result
-        self.get_logger().info(f'Result: {result.success}')
+        self.get_logger().info(f'Waypoint result: {result.success}')
         
+        if result.success:
+            # Waypoint reached successfully, now trigger camera servo
+            self.trigger_camera_servo()
+        else:
+            # Waypoint failed, move to next waypoint after delay
+            self.schedule_next_waypoint()
+
+    def trigger_camera_servo(self):
+        """Trigger the camera servo action"""
+        self.get_logger().info("Triggering camera servo action")
+        
+        # Wait for camera servo action server
+        self._camera_servo_client.wait_for_server()
+        
+        # Create goal message
+        goal_msg = RotateCameraServo.Goal()
+        goal_msg.start = True
+        
+        # Send goal
+        self._send_servo_goal_future = self._camera_servo_client.send_goal_async(
+            goal_msg,
+            feedback_callback=self.servo_feedback_callback
+        )
+        self._send_servo_goal_future.add_done_callback(self.servo_goal_response_callback)
+
+    def servo_goal_response_callback(self, future):
+        """Handle the response from the camera servo action server"""
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().info('Camera servo goal rejected :(')
+            self.schedule_next_waypoint()
+            return
+
+        self.get_logger().info('Camera servo goal accepted :)')
+
+        self._get_servo_result_future = goal_handle.get_result_async()
+        self._get_servo_result_future.add_done_callback(self.servo_result_callback)
+
+    def servo_result_callback(self, future):
+        """Handle the result from the camera servo action server"""
+        result = future.result().result
+        self.get_logger().info(f'Camera servo result: {result.success}')
+        
+        # Regardless of servo result, move to next waypoint
+        self.schedule_next_waypoint()
+
+    def schedule_next_waypoint(self):
+        """Schedule the next waypoint after a delay"""
         # Schedule next waypoint after 15 seconds
         self.timer = threading.Timer(15.0, self._send_next_waypoint)
         self.timer.start()
 
     def feedback_callback(self, feedback_msg):
-        """Handle feedback from the action server"""
+        """Handle feedback from the waypoint action server"""
         feedback = feedback_msg.feedback
-        self.get_logger().info(f'Received feedback: {feedback.current_position}')
+        self.get_logger().info(f'Received waypoint feedback: {feedback.current_position}')
+
+    def servo_feedback_callback(self, feedback_msg):
+        """Handle feedback from the camera servo action server"""
+        feedback = feedback_msg.feedback
+        self.get_logger().info(f'Received servo feedback: {feedback.current_direction}')
 
     def destroy(self):
         """Cleanup before destruction"""
