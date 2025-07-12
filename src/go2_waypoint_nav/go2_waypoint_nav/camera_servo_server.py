@@ -10,7 +10,7 @@ class CameraServoPublisher(Node):
     def __init__(self, x:str, y:str):
         super().__init__('camera_servo_publisher')
         self.publisher_ = self.create_publisher(String, '/servo_move', 10)
-        timer_period = 0.5  # seconds
+        timer_period = 1.5  # seconds
         self.timer = self.create_timer(timer_period, self.servo_callback)
 
         self.x = x
