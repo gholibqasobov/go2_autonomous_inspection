@@ -34,3 +34,8 @@ ros2 run go2_waypoint_nav go2_waypoint_follower
 
 The robot will navigate to the saved goal points.
 
+
+```bash
+ros2 action send_goal /camera_servo_action camera_servo_interfaces/action/CameraServo "{start: true}" --feedback
+```
+
