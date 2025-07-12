@@ -279,13 +279,14 @@ class DamagedObjectTrackerServer(Node):
             angles = msg.data.strip().split()
             if len(angles) >= 2:
                 # Convert servo values to radians
-                # 2000 = 0 degrees, 1000 = 90 degrees, 3000 = -90 degrees
+                # Tilt: 2000 = 0°, 1000 = +90° up, 3000 = -90° down
+                # Pan: 2000 = 0°, 1000 = -90° left, 3000 = +90° right
                 tilt_servo = int(angles[0])  # vertical axis (up/down)
                 pan_servo = int(angles[1])   # horizontal axis (left/right)
                 
-                # Convert to radians: (servo_value - 2000) * (pi/2) / 1000
-                self.servo_angles['tilt'] = (tilt_servo - 2000) * math.pi / 2000
-                self.servo_angles['pan'] = (pan_servo - 2000) * math.pi / 2000
+                # Convert to radians: 1000 servo units = 90° (π/2 radians)
+                self.servo_angles['tilt'] = (2000 - tilt_servo) * (math.pi/2) / 1000
+                self.servo_angles['pan'] = (pan_servo - 2000) * (math.pi/2) / 1000
                 
                 self.get_logger().debug(f"Servo angles - Tilt: {self.servo_angles['tilt']:.2f}rad, Pan: {self.servo_angles['pan']:.2f}rad")
         except Exception as e:
