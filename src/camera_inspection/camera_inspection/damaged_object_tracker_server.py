@@ -78,15 +78,19 @@ class DamagedObjectTrackerServer(Node):
         # Depth and servo state
         self.depth_image = None
         self.servo_angles = {}
+        self.color_image_shape = None  # (height, width)
+        self.depth_image_shape = None  # (height, width)
         
         # Store positions of saved objects by class for proximity check
         self.saved_object_positions = {}
         
         # Camera intrinsic parameters for RealSense D435i
-        self.fx = 615.0
-        self.fy = 615.0
-        self.cx = 320.0
-        self.cy = 240.0
+        # These should match the depth camera calibration
+        # Typical values for 640x480 depth resolution
+        self.fx = 386.738  # Focal length x
+        self.fy = 386.738  # Focal length y  
+        self.cx = 320.0    # Principal point x (image center)
+        self.cy = 240.0    # Principal point y (image center)
         
         # Create output directory
         self.output_dir = "src/camera_inspection/damaged_objects"
@@ -276,6 +280,8 @@ class DamagedObjectTrackerServer(Node):
             
         try:
             self.depth_image = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+            self.depth_image_shape = self.depth_image.shape[:2]  # (height, width)
+            self.get_logger().debug(f"Depth image shape: {self.depth_image_shape}")
         except Exception as e:
             self.get_logger().error(f"Error processing depth image: {str(e)}")
     
@@ -317,6 +323,34 @@ class DamagedObjectTrackerServer(Node):
         except (IndexError, Exception) as e:
             self.get_logger().error(f"Error processing TF message: {str(e)}")
     
+    def scale_coordinates(self, x, y, from_shape, to_shape):
+        """
+        Scale coordinates from one image resolution to another
+        
+        Args:
+            x, y: The coordinates to scale
+            from_shape: The source resolution (height, width)
+            to_shape: The target resolution (height, width)
+            
+        Returns:
+            Scaled coordinates as integers
+        """
+        if from_shape is None or to_shape is None:
+            return x, y
+            
+        from_height, from_width = from_shape
+        to_height, to_width = to_shape
+        
+        # Scale coordinates
+        scaled_x = int(x * (to_width / from_width))
+        scaled_y = int(y * (to_height / from_height))
+        
+        # Ensure coordinates are within bounds
+        scaled_x = max(0, min(scaled_x, to_width - 1))
+        scaled_y = max(0, min(scaled_y, to_height - 1))
+        
+        return scaled_x, scaled_y
+    
     def get_3d_position(self, bbox, depth_img):
         """Calculate 3D position of an object given its bounding box and depth image"""
         if depth_img is None:
@@ -324,21 +358,41 @@ class DamagedObjectTrackerServer(Node):
             return None
         
         x1, y1, x2, y2 = bbox
+        depth_shape = depth_img.shape  # (height, width)
+        
+        # Get center of bounding box in color image coordinates
         center_x = (x1 + x2) // 2
         center_y = (y1 + y2) // 2
         
-        height, width = depth_img.shape
-        if not (0 <= center_x < width and 0 <= center_y < height):
-            self.get_logger().warn(f"Invalid bbox center: ({center_x}, {center_y})")
+        self.get_logger().debug(f"Original center: ({center_x}, {center_y})")
+        
+        # Scale center coordinates from color to depth image if resolutions differ
+        if self.color_image_shape is not None:
+            depth_center_x, depth_center_y = self.scale_coordinates(
+                center_x, center_y, self.color_image_shape, depth_shape
+            )
+        else:
+            depth_center_x, depth_center_y = center_x, center_y
+            
+        self.get_logger().debug(f"Scaled center: ({depth_center_x}, {depth_center_y})")
+        
+        # Verify coordinates are within depth image bounds
+        height, width = depth_shape
+        if not (0 <= depth_center_x < width and 0 <= depth_center_y < height):
+            self.get_logger().warn(
+                f"Invalid bbox center after scaling: color ({center_x}, {center_y}) → "
+                f"depth ({depth_center_x}, {depth_center_y}), depth shape: {depth_shape}"
+            )
             return None
         
-        # Get depth at center point
+        # Get depth at center point - average a small region for stability
         region_size = 5
-        x_min = max(0, center_x - region_size)
-        x_max = min(width, center_x + region_size)
-        y_min = max(0, center_y - region_size)
-        y_max = min(height, center_y + region_size)
+        x_min = max(0, depth_center_x - region_size)
+        x_max = min(width, depth_center_x + region_size)
+        y_min = max(0, depth_center_y - region_size)
+        y_max = min(height, depth_center_y + region_size)
         
+        # Extract depth region and filter out zero/invalid values
         depth_region = depth_img[y_min:y_max, x_min:x_max]
         valid_depths = depth_region[depth_region > 0]
         
@@ -346,12 +400,22 @@ class DamagedObjectTrackerServer(Node):
             self.get_logger().warn("No valid depth values in region")
             return None
         
-        depth_m = np.median(valid_depths) / 1000.0
+        # Get median depth value in millimeters, convert to meters
+        depth_mm = np.median(valid_depths)
+        depth_m = depth_mm / 1000.0
         
-        # Calculate 3D coordinates in camera frame
-        x = (center_x - self.cx) * depth_m / self.fx
-        y = (center_y - self.cy) * depth_m / self.fy
+        # Validate depth is within reasonable range (0.1m to 10m)
+        if not (0.1 <= depth_m <= 10.0):
+            self.get_logger().warn(f"Unreasonable depth value: {depth_m}m")
+            return None
+        
+        # Calculate 3D coordinates in camera frame using properly scaled coordinates
+        # Use the scaled coordinates for accurate projection
+        x = (depth_center_x - self.cx) * depth_m / self.fx
+        y = (depth_center_y - self.cy) * depth_m / self.fy
         z = depth_m
+        
+        self.get_logger().debug(f"Camera frame position: ({x:.3f}, {y:.3f}, {z:.3f})")
         
         # Transform to world frame using servo angles
         if 'pan' in self.servo_angles and 'tilt' in self.servo_angles:
@@ -380,6 +444,7 @@ class DamagedObjectTrackerServer(Node):
             
         try:
             frame = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            self.color_image_shape = frame.shape[:2]  # Store color image shape (height, width)
             
             # Check if stationary
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -490,6 +555,12 @@ class DamagedObjectTrackerServer(Node):
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
             cv2.putText(frame, f"Saved objects: {len(self.saved_ids)}", (20, 110),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
+            
+            # Add resolution information for debugging
+            if self.color_image_shape and self.depth_image_shape:
+                resolution_text = f"Color: {self.color_image_shape[1]}x{self.color_image_shape[0]}, Depth: {self.depth_image_shape[1]}x{self.depth_image_shape[0]}"
+                cv2.putText(frame, resolution_text, (20, 150),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             
             # Publish annotated image
             annotated_msg = self.cv_bridge.cv2_to_imgmsg(frame, encoding='bgr8')
