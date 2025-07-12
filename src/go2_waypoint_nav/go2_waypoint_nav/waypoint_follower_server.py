@@ -34,6 +34,8 @@ class WaypointFollowerServer(Node):
 
         # Publisher for Servo
         self.servo_publisher_ = self.create_publisher(String, '/servo_move', 10)
+        time_period = 1.5 # seconds
+        self.timer = self.create_timer(time_period, self.publish_servo_command)
 
 
 
@@ -43,7 +45,14 @@ class WaypointFollowerServer(Node):
         self._goal_canceled = False
 
         self.home_pose = '{ "data":"2000 2000"}'
-        self.servo_angles = [self.home_pose, '{ "data":"2000 3000"}', '{ "data":"2000 1000"}', self.home_pose]
+        self.servo_angles = [self.home_pose, '{ "data":"2000 3000"}', '{ "data":"2000 1500"}', self.home_pose]
+    
+    def publish_servo_command(self, direction):
+        servo_msg = String()
+        servo_msg.data = direction
+        self.servo_publisher_.publish(servo_msg)
+        self.get_logger().info(f"Sent servo cmd: {servo_msg.data}")
+            
 
     def goal_callback(self, goal_request):
         self.get_logger().info(f"Received goal request: {goal_request.waypoint_file}")
@@ -102,17 +111,20 @@ class WaypointFollowerServer(Node):
             self.goal_index += 1
             # await rclpy.task.sleep(7.0)
             time.sleep(15.0)
-            servo_msg = String()
-            for direction in self.servo_angles:
-                start_time = time.time()
-                while time.time() - start_time < 4.0:
-                    servo_msg.data = direction
-                    self.servo_publisher_.publish(servo_msg)
-                    self.get_logger().info(f"Publishing: {direction}")
-                    time.sleep(0.2)
-                time.sleep(5)
+            # servo_msg = String()
+            # for direction in self.servo_angles:
+            #     start_time = time.time()
+            #     while time.time() - start_time < 4.0:
+            #         servo_msg.data = direction
+            #         self.servo_publisher_.publish(servo_msg)
+            #         self.get_logger().info(f"Publishing: {direction}")
+            #         time.sleep(0.2)
+            #     time.sleep(5)
+
+            for goal_index in self.servo_angles:
+                self.publish_servo_command(goal_index)
+                time.sleep(4)
             
-            # time.sleep(2.0)
 
         self.get_logger().info("All goals sent successfully")
         result.success = True
