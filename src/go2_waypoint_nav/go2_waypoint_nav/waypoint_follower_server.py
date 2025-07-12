@@ -34,8 +34,8 @@ class WaypointFollowerServer(Node):
 
         # Publisher for Servo
         self.servo_publisher_ = self.create_publisher(String, '/servo_move', 10)
-        time_period = 1.5 # seconds
-        self.timer = self.create_timer(time_period, self.publish_servo_command)
+        self.time_period = 1.5 # seconds
+        # self.timer = self.create_timer(time_period, self.publish_servo_command(self.servo_angles))
 
 
 
@@ -44,14 +44,17 @@ class WaypointFollowerServer(Node):
         self._goal_handle = None
         self._goal_canceled = False
 
-        self.home_pose = '{ "data":"2000 2000"}'
-        self.servo_angles = [self.home_pose, '{ "data":"2000 3000"}', '{ "data":"2000 1500"}', self.home_pose]
+        self.home_pose = "2000 2000"
+        self.servo_angles = [self.home_pose, "2000 3000", "2000 1500", self.home_pose]
     
-    def publish_servo_command(self, direction):
+    
+    def publish_servo_command(self, servo_angles):
         servo_msg = String()
-        servo_msg.data = direction
-        self.servo_publisher_.publish(servo_msg)
-        self.get_logger().info(f"Sent servo cmd: {servo_msg.data}")
+        for direction in servo_angles:
+            servo_msg.data = direction
+            self.servo_publisher_.publish(servo_msg)
+            self.get_logger().info(f"Sent servo cmd: {servo_msg.data}")
+            time.sleep(2)
             
 
     def goal_callback(self, goal_request):
@@ -64,10 +67,12 @@ class WaypointFollowerServer(Node):
         return CancelResponse.ACCEPT
 
     async def execute_callback(self, goal_handle):
+        self.timer = self.create_timer(self.time_period, lambda: self.publish_servo_command(self.servo_angles))
+
         self._goal_handle = goal_handle
         self._goal_canceled = False
 
-        filename = goal_handle.request.waypoint_file
+        filename = goal_handle.request.waypoint_files
         result = WaypointFollower.Result()
 
         # Relative Path: src/go2_waypoint_nav/navigation_path/test_waypoint.yaml
@@ -121,9 +126,11 @@ class WaypointFollowerServer(Node):
             #         time.sleep(0.2)
             #     time.sleep(5)
 
-            for goal_index in self.servo_angles:
-                self.publish_servo_command(goal_index)
-                time.sleep(4)
+            # for goal_index in self.servo_angles:
+                # self.publish_servo_command(goal_index)
+                # time.sleep(4)
+            
+            self.publish_servo_command(self.servo_angles)
             
 
         self.get_logger().info("All goals sent successfully")
