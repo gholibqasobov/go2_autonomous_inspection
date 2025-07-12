@@ -25,6 +25,7 @@ setup(
             'go2_waypoint_follower_odom = go2_waypoint_nav.waypoint_follower_odom:main',
             'go2_waypoint_follower_server = go2_waypoint_nav.waypoint_follower_server:main',
             'camera_servo_server = go2_waypoint_nav.camera_servo_server:main',
+            'waypoint_client = go2_waypoint_nav.waypoint_follower_client:main',
         ],
     },
 )
