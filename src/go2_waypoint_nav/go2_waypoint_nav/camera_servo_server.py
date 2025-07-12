@@ -7,7 +7,7 @@ from std_msgs.msg import String
 
 class CameraServoPublisher(Node):
 
-    def __init__(self, x, y):
+    def __init__(self, x:str, y:str):
         super().__init__('camera_servo_publisher')
         self.publisher_ = self.create_publisher(String, '/servo_move', 10)
         timer_period = 0.5  # seconds
@@ -18,8 +18,10 @@ class CameraServoPublisher(Node):
 
     def servo_callback(self):
         msg = String()
-        msg.data = f'{ "data":"{self.x} {self.y}"}'
+        msg.data = f"{self.x} {self.y}"
+
         self.publisher_.publish(msg)
+        self.get_logger().info(f"Publishing: {self.x}, {self.y}")
 
 
 def main(args=None):
@@ -42,3 +44,12 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
+
+'''
+
+[INFO] [1752313503.557251719] [camera_servo_node]: Sent to serial: std_msgs.msg.String(data='1500 1500')
+[INFO] [1752313468.483084429] [camera_servo_node]: Sent to serial: std_msgs.msg.String(data='{"data": "1500 1500"}')
+
+[INFO] [1752313629.038020907] [camera_servo_node]: Sent to serial: std_msgs.msg.String(data='2000 2000')
+'''
