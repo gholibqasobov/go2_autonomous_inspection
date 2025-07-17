@@ -166,7 +166,7 @@ class WaypointFollowerClient(Node):
     def schedule_next_waypoint(self):
         """Schedule the next waypoint after a delay"""
         # Schedule next waypoint after 15 seconds
-        self.timer = threading.Timer(15.0, self._send_next_waypoint)
+        self.timer = threading.Timer(12.0, self._send_next_waypoint)
         self.timer.start()
 
     def feedback_callback(self, feedback_msg):

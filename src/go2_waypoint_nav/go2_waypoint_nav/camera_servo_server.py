@@ -26,7 +26,7 @@ class CameraServoActionServer(Node):
 
         # Servo positions
         self.home_pose = "2000 2000"
-        self.directions = ["2000 1500", "2000 3000", "1500 1500"]
+        self.directions = ["2000 3000", "2000 1000", "1500 1000", "1500 2000", "1500 3000", "1000 3000", "1000 2000"]
         
         self._goal_handle = None
         self._goal_canceled = False
@@ -59,7 +59,7 @@ class CameraServoActionServer(Node):
         feedback_msg = RotateCameraServo.Feedback()
         feedback_msg.current_direction = "home"
         goal_handle.publish_feedback(feedback_msg)
-        self._sleep_with_cancel_check(7.0)
+        self._sleep_with_cancel_check(2.0)
 
         if self._goal_canceled:
             result.success = False
@@ -71,7 +71,7 @@ class CameraServoActionServer(Node):
             self._publish_servo_command(direction)
             feedback_msg.current_direction = direction
             goal_handle.publish_feedback(feedback_msg)
-            self._sleep_with_cancel_check(7.0)
+            self._sleep_with_cancel_check(4.0)
 
             if self._goal_canceled:
                 result.success = False
@@ -82,7 +82,7 @@ class CameraServoActionServer(Node):
         self._publish_servo_command(self.home_pose)
         feedback_msg.current_direction = "home"
         goal_handle.publish_feedback(feedback_msg)
-        self._sleep_with_cancel_check(7.0)
+        self._sleep_with_cancel_check(4.0)
 
         # Complete the action
         result.success = True
