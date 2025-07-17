@@ -9,6 +9,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 import threading
 import time
+from std_srvs.srv import SetBool
 
 class WaypointFollowerClient(Node):
 
@@ -32,13 +33,19 @@ class WaypointFollowerClient(Node):
             callback_group=self.callback_group
         )
         
+        # Inspection service client
+        self._inspection_client = self.create_client(
+            SetBool,
+            '/damaged_object_tracker_server/start_inspection',
+            callback_group=self.callback_group
+        )
+        
         self.current_goal_handle = None
         self.waypoints = []
         self.current_waypoint_index = 0
         self.timer = None
 
     def load_waypoints_from_yaml(self, yaml_file_path):
-        """Load waypoints from YAML file"""
         if not os.path.exists(yaml_file_path):
             self.get_logger().error(f"YAML file not found: {yaml_file_path}")
             return False
@@ -53,8 +60,7 @@ class WaypointFollowerClient(Node):
                 self.get_logger().error(f"Error parsing YAML file: {e}")
                 return False
 
-    def start_waypoint_sequence(self, interval_sec=15):
-        """Start sending waypoints at specified interval"""
+    def start_waypoint_sequence(self, interval_sec=12):
         if not self.waypoints:
             self.get_logger().error("No waypoints loaded")
             return
@@ -64,7 +70,6 @@ class WaypointFollowerClient(Node):
         self._send_next_waypoint()
 
     def _send_next_waypoint(self):
-        """Send the next waypoint in the sequence"""
         if self.current_waypoint_index >= len(self.waypoints):
             self.get_logger().info("All waypoints completed!")
             return
@@ -77,16 +82,14 @@ class WaypointFollowerClient(Node):
         self.current_waypoint_index += 1
 
     def send_goal(self, x, y, z):
-        """Send a waypoint goal to the action server"""
-        # Create a PointStamped message for the waypoint
         waypoint = PointStamped()
         waypoint.header.stamp = self.get_clock().now().to_msg()
-        waypoint.header.frame_id = 'map'  # Adjust frame_id as needed
+        waypoint.header.frame_id = 'map'  
         waypoint.point.x = x
         waypoint.point.y = y
         waypoint.point.z = z
 
-        # Create goal message
+        # goal message
         goal_msg = WaypointFollower.Goal()
         goal_msg.waypoint = waypoint
 
@@ -101,7 +104,6 @@ class WaypointFollowerClient(Node):
         self._send_goal_future.add_done_callback(self.waypoint_goal_response_callback)
 
     def waypoint_goal_response_callback(self, future):
-        """Handle the response from the waypoint action server"""
         self.current_goal_handle = future.result()
         if not self.current_goal_handle.accepted:
             self.get_logger().info('Waypoint goal rejected :(')
@@ -113,25 +115,49 @@ class WaypointFollowerClient(Node):
         self._get_result_future.add_done_callback(self.waypoint_result_callback)
 
     def waypoint_result_callback(self, future):
-        """Handle the result from the waypoint action server"""
         result = future.result().result
         self.get_logger().info(f'Waypoint result: {result.success}')
         
         if result.success:
-            # Waypoint reached successfully, now trigger camera servo
-            self.trigger_camera_servo()
+            # Waypoint reached successfully, trigger inspection and camera servo
+            self.start_inspection_and_trigger_servo()
         else:
             # Waypoint failed, move to next waypoint after delay
             self.schedule_next_waypoint()
 
+    def start_inspection_and_trigger_servo(self):
+        if not self._inspection_client.service_is_ready():
+            self.get_logger().warn("Inspection service not available, skipping inspection")
+            self.trigger_camera_servo()
+            return
+            
+        self.get_logger().info("Starting inspection before triggering camera servo")
+        request = SetBool.Request()
+        request.data = True
+        
+        future = self._inspection_client.call_async(request)
+        future.add_done_callback(self.inspection_start_callback)
+
+    def inspection_start_callback(self, future):
+        try:
+            response = future.result()
+            if response.success:
+                self.get_logger().info(f'Inspection started successfully: {response.message}')
+            else:
+                self.get_logger().warn(f'Failed to start inspection: {response.message}')
+        except Exception as e:
+            self.get_logger().error(f'Service call failed: {str(e)}')
+        
+        # Regardless of inspection start result, proceed with servo
+        self.trigger_camera_servo()
+
     def trigger_camera_servo(self):
-        """Trigger the camera servo action"""
         self.get_logger().info("Triggering camera servo action")
         
         # Wait for camera servo action server
         self._camera_servo_client.wait_for_server()
         
-        # Create goal message
+        #goal message
         goal_msg = RotateCameraServo.Goal()
         goal_msg.start = True
         
@@ -143,11 +169,10 @@ class WaypointFollowerClient(Node):
         self._send_servo_goal_future.add_done_callback(self.servo_goal_response_callback)
 
     def servo_goal_response_callback(self, future):
-        """Handle the response from the camera servo action server"""
         goal_handle = future.result()
         if not goal_handle.accepted:
             self.get_logger().info('Camera servo goal rejected :(')
-            self.schedule_next_waypoint()
+            self.stop_inspection_and_schedule_next()
             return
 
         self.get_logger().info('Camera servo goal accepted :)')
@@ -156,31 +181,52 @@ class WaypointFollowerClient(Node):
         self._get_servo_result_future.add_done_callback(self.servo_result_callback)
 
     def servo_result_callback(self, future):
-        """Handle the result from the camera servo action server"""
         result = future.result().result
         self.get_logger().info(f'Camera servo result: {result.success}')
         
-        # Regardless of servo result, move to next waypoint
+        # Stop inspection and schedule next waypoint
+        self.stop_inspection_and_schedule_next()
+
+    def stop_inspection_and_schedule_next(self):
+        if not self._inspection_client.service_is_ready():
+            self.get_logger().warn("Inspection service not available, skipping stop")
+            self.schedule_next_waypoint()
+            return
+            
+        self.get_logger().info("Stopping inspection after servo action")
+        request = SetBool.Request()
+        request.data = False
+        
+        future = self._inspection_client.call_async(request)
+        future.add_done_callback(self.inspection_stop_callback)
+
+    def inspection_stop_callback(self, future):
+        try:
+            response = future.result()
+            if response.success:
+                self.get_logger().info(f'Inspection stopped successfully: {response.message}')
+            else:
+                self.get_logger().warn(f'Failed to stop inspection: {response.message}')
+        except Exception as e:
+            self.get_logger().error(f'Service call failed: {str(e)}')
+        
+        # Regardless of inspection stop result, schedule next waypoint
         self.schedule_next_waypoint()
 
     def schedule_next_waypoint(self):
-        """Schedule the next waypoint after a delay"""
-        # Schedule next waypoint after 15 seconds
+        # next waypoint after default: 12 seconds
         self.timer = threading.Timer(12.0, self._send_next_waypoint)
         self.timer.start()
 
     def feedback_callback(self, feedback_msg):
-        """Handle feedback from the waypoint action server"""
         feedback = feedback_msg.feedback
         self.get_logger().info(f'Received waypoint feedback: {feedback.current_position}')
 
     def servo_feedback_callback(self, feedback_msg):
-        """Handle feedback from the camera servo action server"""
         feedback = feedback_msg.feedback
         self.get_logger().info(f'Received servo feedback: {feedback.current_direction}')
 
     def destroy(self):
-        """Cleanup before destruction"""
         if self.timer is not None:
             self.timer.cancel()
         if self.current_goal_handle is not None:
@@ -191,7 +237,6 @@ class WaypointFollowerClient(Node):
 def main(args=None):
     rclpy.init(args=args)
     
-    # Create client node
     action_client = WaypointFollowerClient()
     
     # Load waypoints from YAML file
@@ -204,7 +249,6 @@ def main(args=None):
     # Start the waypoint sequence
     action_client.start_waypoint_sequence(interval_sec=15)
     
-    # Use MultiThreadedExecutor to handle callbacks properly
     executor = MultiThreadedExecutor()
     executor.add_node(action_client)
     
