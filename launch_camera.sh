@@ -1,11 +1,21 @@
-ros2 run camera_servo camera_servo_node
+#!/bin/bash
 
-ros2 launch realsense2_camera rs_launch.py
+# Change directory to home directory
+echo "Changing to home directory..."
+cd ~
 
-ros2 run camera_inspection damaged_object_tracker_server
 
-ros2 run go2_waypoint_nav camera_servo_server
+source ~/go2_autonomous_inspection/install/setup.bash
+source ~/autonomy_stack_go2/install/setup.bash
+sleep 2
 
-ros2 run go2_waypoint_nav waypoint_client
 
-ros2 run go2_waypoint_nav go2_waypoint_follower
+# Launch RealSense Camera
+gnome-terminal -- bash -c "ros2 launch realsense2_camera rs_launch.py; exec bash"
+sleep 2
+
+# Launch Servo Node
+gnome-terminal -- bash -c "ros2 run camera_servo camera_servo_node; exec bash"
+sleep 2
+
+
