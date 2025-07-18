@@ -240,7 +240,7 @@ def main(args=None):
     action_client = WaypointFollowerClient()
     
     # Load waypoints from YAML file
-    yaml_file_path = '/home/qasob/go2_autonomous_inspection/src/go2_waypoint_nav/navigation_path/test_waypoint.yaml'  # Update this path if needed
+    yaml_file_path = '/home/dog/go2_autonomous_inspection/src/go2_waypoint_nav/navigation_path/test_waypoint.yaml'  # Update this path if needed
     if not action_client.load_waypoints_from_yaml(yaml_file_path):
         action_client.destroy()
         rclpy.shutdown()
