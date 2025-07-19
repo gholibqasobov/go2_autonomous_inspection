@@ -1,66 +1,47 @@
 [
   {
     "id": "1",
-    "class_name": "half_working_light",
-    "image_file": "object_1_20250712_151302.jpg",
-    "timestamp": 1752315177.8373578,
+    "class_name": "light_on",
+    "image_file": "object_1_20250719_130925.jpg",
+    "timestamp": 1752912548.1067567,
     "bbox": {
-      "x1": 419,
-      "y1": 191,
-      "x2": 742,
-      "y2": 485
+      "x1": 410,
+      "y1": 0,
+      "x2": 768,
+      "y2": 258
     },
     "robot_position": {
-      "x": 0.0,
-      "y": 0.0,
-      "z": 0.3659999966621399
+      "x": 0,
+      "y": 0,
+      "z": 0
     },
     "world_position": {
-      "x": -0.7912835877437506,
-      "y": -1.7021641853032943,
-      "z": 2.902976983492164
+      "x": 0.3995844788038237,
+      "y": -1.6220710233725495,
+      "z": 2.911005825988888
     },
     "transformation_success": true
   },
   {
-    "id": "2",
-    "class_name": "light_on",
-    "image_file": "object_2_20250712_151302.jpg",
-    "timestamp": 1752315177.8373578,
-    "bbox": {
-      "x1": 1030,
-      "y1": 0,
-      "x2": 1155,
-      "y2": 38
-    },
-    "robot_position": {
-      "x": 0.0,
-      "y": 0.0,
-      "z": 0.3659999966621399
-    },
-    "world_position": null,
-    "transformation_success": false
-  },
-  {
-    "id": "2",
+    "id": "3",
     "class_name": "half_working_light",
-    "image_file": "object_2_20250712_151458.jpg",
-    "timestamp": 1752315294.9789786,
+    "image_file": "object_3_20250719_130927.jpg",
+    "timestamp": 1752912548.3072023,
     "bbox": {
-      "x1": 411,
-      "y1": 63,
-      "x2": 760,
-      "y2": 390
+      "x1": 640,
+      "y1": 146,
+      "x2": 930,
+      "y2": 417
     },
     "robot_position": {
-      "x": 0.0,
-      "y": 0.0,
-      "z": 0.3659999966621399
+      "x": 0,
+      "y": 0,
+      "z": 0
     },
     "world_position": {
-      "x": 2.7424297483599274,
-      "y": -2.4794705873518006,
-      "z": 0.9991218188794933
+      "x": -0.19754258893334398,
+      "y": -2.8481720476114134,
+      "z": 2.494643575180136
     },
     "transformation_success": true
   }
