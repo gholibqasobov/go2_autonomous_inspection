@@ -58,15 +58,19 @@ class DamagedObjectTrackerServer(Node):
         
         # Object tracking parameters
         self.CONF_THRESH = 0.5
-        self.STATIONARY_THRESH = 5000
-        self.DIFF_THRESH = 25
+        self.STATIONARY_THRESH = 3000  # Reduced for more sensitive motion detection
+        self.DIFF_THRESH = 20          # Reduced for more sensitive motion detection
         self.PROXIMITY_THRESH = 0.3
         
-        # Initialize tracker
+        # Camera motion detection parameters
+        self.SERVO_MOTION_THRESH = 0.02  # ~1.1 degrees in radians
+        self.SERVO_STABLE_FRAMES = 5     # Frames to wait after servo stops moving
+        
+        # Initialize tracker with parameters optimized for moving camera
         self.tracker = DeepSort(
-            max_age=30,
-            n_init=3,
-            max_cosine_distance=0.2
+            max_age=12,              # Reduced from 30 - shorter track persistence
+            n_init=5,                # Increased from 3 - more confirmations needed
+            max_cosine_distance=0.15  # Reduced from 0.2 - more restrictive matching
         )
         
         # Tracking state
@@ -78,8 +82,14 @@ class DamagedObjectTrackerServer(Node):
         # Depth and servo state
         self.depth_image = None
         self.servo_angles = {}
+        self.previous_servo_angles = {}
         self.color_image_shape = None  # (height, width)
         self.depth_image_shape = None  # (height, width)
+        
+        # Motion detection state
+        self.servo_motion_detected = False
+        self.frames_since_servo_stopped = 0
+        self.camera_is_moving = False
         
         # Store positions of saved objects by class for proximity check
         self.saved_object_positions = {}
@@ -165,10 +175,14 @@ class DamagedObjectTrackerServer(Node):
         
         # Reset tracking state
         self.last_gray = None
+        self.servo_motion_detected = False
+        self.frames_since_servo_stopped = 0
+        self.camera_is_moving = False
+        self.previous_servo_angles = {}
         self.tracker = DeepSort(
-            max_age=30,
-            n_init=3,
-            max_cosine_distance=0.2
+            max_age=12,              # Optimized for moving camera
+            n_init=5,                # More confirmations needed
+            max_cosine_distance=0.15  # More restrictive matching
         )
         
         # Create subscriptions
@@ -286,7 +300,7 @@ class DamagedObjectTrackerServer(Node):
             self.get_logger().error(f"Error processing depth image: {str(e)}")
     
     def servo_callback(self, msg):
-        """Store the servo angles from camera_servo package"""
+        """Store the servo angles from camera_servo package and detect motion"""
         if not self.inspection_active:
             return
             
@@ -301,10 +315,35 @@ class DamagedObjectTrackerServer(Node):
                 pan_servo = int(angles[1])   # horizontal axis (left/right)
                 
                 # Convert to radians: 1000 servo units = 90° (π/2 radians)
-                self.servo_angles['tilt'] = (2000 - tilt_servo) * (math.pi/2) / 1000
-                self.servo_angles['pan'] = (pan_servo - 2000) * (math.pi/2) / 1000
+                new_tilt = (2000 - tilt_servo) * (math.pi/2) / 1000
+                new_pan = (pan_servo - 2000) * (math.pi/2) / 1000
                 
-                self.get_logger().debug(f"Servo angles - Tilt: {self.servo_angles['tilt']:.2f}rad, Pan: {self.servo_angles['pan']:.2f}rad")
+                # Detect servo motion
+                servo_motion = False
+                if self.previous_servo_angles:
+                    tilt_diff = abs(new_tilt - self.previous_servo_angles.get('tilt', new_tilt))
+                    pan_diff = abs(new_pan - self.previous_servo_angles.get('pan', new_pan))
+                    
+                    if tilt_diff > self.SERVO_MOTION_THRESH or pan_diff > self.SERVO_MOTION_THRESH:
+                        servo_motion = True
+                        self.servo_motion_detected = True
+                        self.frames_since_servo_stopped = 0
+                        self.get_logger().debug(f"Servo motion detected - Tilt diff: {tilt_diff:.3f}rad, Pan diff: {pan_diff:.3f}rad")
+                
+                # Update servo angles
+                self.previous_servo_angles = self.servo_angles.copy()
+                self.servo_angles['tilt'] = new_tilt
+                self.servo_angles['pan'] = new_pan
+                
+                # Update motion state
+                if not servo_motion and self.servo_motion_detected:
+                    self.frames_since_servo_stopped += 1
+                    if self.frames_since_servo_stopped >= self.SERVO_STABLE_FRAMES:
+                        self.servo_motion_detected = False
+                        self.frames_since_servo_stopped = 0
+                        self.get_logger().debug("Servo motion stopped, camera stabilized")
+                
+                self.get_logger().debug(f"Servo angles - Tilt: {self.servo_angles['tilt']:.2f}rad, Pan: {self.servo_angles['pan']:.2f}rad, Motion: {self.servo_motion_detected}")
         except Exception as e:
             self.get_logger().error(f"Error processing servo angles: {str(e)}")
     
@@ -409,33 +448,50 @@ class DamagedObjectTrackerServer(Node):
             self.get_logger().warn(f"Unreasonable depth value: {depth_m}m")
             return None
         
-        # Calculate 3D coordinates in camera frame using properly scaled coordinates
+        # Calculate 3D coordinates in camera frame (ROS standard: X=right, Y=down, Z=forward)
         # Use the scaled coordinates for accurate projection
-        x = (depth_center_x - self.cx) * depth_m / self.fx
-        y = (depth_center_y - self.cy) * depth_m / self.fy
-        z = depth_m
+        cam_x = (depth_center_x - self.cx) * depth_m / self.fx  # Right (+) / Left (-)
+        cam_y = (depth_center_y - self.cy) * depth_m / self.fy  # Down (+) / Up (-)
+        cam_z = depth_m  # Forward distance from camera
         
-        self.get_logger().debug(f"Camera frame position: ({x:.3f}, {y:.3f}, {z:.3f})")
+        self.get_logger().debug(f"Camera frame position: X={cam_x:.3f}, Y={cam_y:.3f}, Z={cam_z:.3f}")
         
         # Transform to world frame using servo angles
         if 'pan' in self.servo_angles and 'tilt' in self.servo_angles:
-            pan = self.servo_angles['pan']
-            tilt = self.servo_angles['tilt']
+            pan = self.servo_angles['pan']    # Horizontal rotation (left/right)
+            tilt = self.servo_angles['tilt']  # Vertical rotation (up/down)
             
-            # Apply tilt and pan transformations
-            y_tilt = y * math.cos(tilt) - z * math.sin(tilt)
-            z_tilt = y * math.sin(tilt) + z * math.cos(tilt)
+            self.get_logger().debug(f"Servo angles: Pan={pan:.3f}rad ({math.degrees(pan):.1f}°), Tilt={tilt:.3f}rad ({math.degrees(tilt):.1f}°)")
             
-            x_pan = x * math.cos(pan) + z_tilt * math.sin(pan)
-            z_pan = -x * math.sin(pan) + z_tilt * math.cos(pan)
+            # Step 1: Apply tilt rotation (around camera's X-axis)
+            # Tilt rotates the Y-Z plane: positive tilt = look up, negative tilt = look down
+            y_after_tilt = cam_y * math.cos(tilt) - cam_z * math.sin(tilt)
+            z_after_tilt = cam_y * math.sin(tilt) + cam_z * math.cos(tilt)
+            x_after_tilt = cam_x  # X unchanged by tilt
             
-            world_x = x_pan + self.robot_position[0]
-            world_y = y_tilt + self.robot_position[1]
-            world_z = z_pan + self.robot_position[2]
+            # Step 2: Apply pan rotation (around robot's Z-axis / camera's Y-axis after tilt)
+            # Pan rotates the X-Z plane: positive pan = look right, negative pan = look left
+            # In world frame: X=forward, Y=left, Z=up when robot faces forward
+            x_final = x_after_tilt * math.cos(pan) + z_after_tilt * math.sin(pan)
+            y_final = -x_after_tilt * math.sin(pan) + z_after_tilt * math.cos(pan)  
+            z_final = -y_after_tilt  # Convert camera Y (down) to world Z (up)
+            
+            self.get_logger().debug(f"After servo transforms: X={x_final:.3f}, Y={y_final:.3f}, Z={z_final:.3f}")
+            
+            # Step 3: Transform to world coordinates
+            # Robot position gives us the robot's location in world frame
+            # When robot is at home position facing forward: robot X-axis = world X-axis (forward)
+            world_x = y_final + self.robot_position[0]  # Forward/backward in world
+            world_y = -x_final + self.robot_position[1]  # Left/right in world  
+            world_z = z_final + self.robot_position[2]   # Up/down in world
+            
+            self.get_logger().debug(f"World frame position: X={world_x:.3f}, Y={world_y:.3f}, Z={world_z:.3f}")
             
             return (world_x, world_y, world_z)
         else:
-            return (x, y, z)
+            # Fallback: return camera frame coordinates if no servo data
+            self.get_logger().warn("No servo angle data available, returning camera frame coordinates")
+            return (cam_z, -cam_x, -cam_y)  # Approximate transformation
     
     def save_damaged_image(self, msg):
         """Process camera images and track damaged objects"""
@@ -446,18 +502,30 @@ class DamagedObjectTrackerServer(Node):
             frame = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
             self.color_image_shape = frame.shape[:2]  # Store color image shape (height, width)
             
-            # Check if stationary
+            # Check if camera is moving (frame difference + servo motion)
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             if self.last_gray is None:
                 self.last_gray = gray
                 return
                 
+            # Frame difference motion detection
             diff = cv2.absdiff(gray, self.last_gray)
             moving_pixels = np.count_nonzero(diff > self.DIFF_THRESH)
+            frame_motion_detected = moving_pixels >= self.STATIONARY_THRESH
+            
+            # Combined motion detection: frame motion OR servo motion
+            self.camera_is_moving = frame_motion_detected or self.servo_motion_detected
+            
             self.last_gray = gray
             
-            if moving_pixels >= self.STATIONARY_THRESH:
-                self.get_logger().debug("Moving - waiting for stability")
+            if self.camera_is_moving:
+                motion_reason = []
+                if frame_motion_detected:
+                    motion_reason.append(f"frame_motion({moving_pixels}px)")
+                if self.servo_motion_detected:
+                    motion_reason.append("servo_motion")
+                
+                self.get_logger().debug(f"Camera moving - {', '.join(motion_reason)} - skipping detection")
                 return
             
             # Run YOLO detection
@@ -551,15 +619,17 @@ class DamagedObjectTrackerServer(Node):
             # Add status overlay
             cv2.putText(frame, f"INSPECTION: {'ACTIVE' if self.inspection_active else 'INACTIVE'}", 
                        (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
-            cv2.putText(frame, f"Unique objects: {len(self.unique_ids)}", (20, 70),
+            cv2.putText(frame, f"CAMERA: {'MOVING' if self.camera_is_moving else 'STABLE'}", 
+                       (20, 70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255) if self.camera_is_moving else (0, 255, 0), 2)
+            cv2.putText(frame, f"Unique objects: {len(self.unique_ids)}", (20, 110),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
-            cv2.putText(frame, f"Saved objects: {len(self.saved_ids)}", (20, 110),
+            cv2.putText(frame, f"Saved objects: {len(self.saved_ids)}", (20, 150),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
             
             # Add resolution information for debugging
             if self.color_image_shape and self.depth_image_shape:
                 resolution_text = f"Color: {self.color_image_shape[1]}x{self.color_image_shape[0]}, Depth: {self.depth_image_shape[1]}x{self.depth_image_shape[0]}"
-                cv2.putText(frame, resolution_text, (20, 150),
+                cv2.putText(frame, resolution_text, (20, 190),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             
             # Publish annotated image
