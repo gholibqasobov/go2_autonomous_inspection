@@ -27,6 +27,7 @@ setup(
             'camera_servo_server = go2_waypoint_nav.camera_servo_server:main',
             'waypoint_client = go2_waypoint_nav.waypoint_follower_client:main',
             'inspection_client = go2_waypoint_nav.waypoint_inspection_client:main',
+            'waypoint_saver_with_object_id = go2_waypoint_nav.waypoint_saver_with_object_id:main',
         ],
     },
 )
