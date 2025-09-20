@@ -28,6 +28,7 @@ setup(
             'waypoint_client = go2_waypoint_nav.waypoint_follower_client:main',
             'inspection_client = go2_waypoint_nav.waypoint_inspection_client:main',
             'waypoint_saver_with_object_id = go2_waypoint_nav.waypoint_saver_with_object_id:main',
+            'track_waypoint_reached = go2_waypoint_nav.track_waypoint_reached:main',
         ],
     },
 )

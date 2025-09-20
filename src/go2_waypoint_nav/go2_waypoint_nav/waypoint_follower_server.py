@@ -49,7 +49,7 @@ class WaypointFollowerServer(Node):
         result = WaypointFollower.Result()
 
         self.send_auto_mode_joy()
-        time.sleep(2.0)
+        time.sleep(2.0)  # change to 1 if robot starts moving forward before waypoint
 
         if goal_handle.is_cancel_requested:
             self.get_logger().info("Goal canceled")
