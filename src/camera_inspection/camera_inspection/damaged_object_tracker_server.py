@@ -2,6 +2,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from tf2_msgs.msg import TFMessage
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
@@ -16,6 +17,7 @@ from datetime import datetime
 import math
 from std_srvs.srv import SetBool, Trigger
 from threading import Lock
+from go2_interfaces.action import DetectClosest
 
 class DamagedObjectTrackerServer(Node):
     def __init__(self):
@@ -118,6 +120,33 @@ class DamagedObjectTrackerServer(Node):
         # Statistics
         self.detection_count = 0
         self.start_time = None
+
+        # Action server: DetectClosest (find one closest-to-center of a class)
+        self.detect_action_server = ActionServer(
+            self,
+            DetectClosest,
+            '~/detect_closest',
+            execute_callback=self.execute_detect_closest,
+            goal_callback=self.detect_goal_callback,
+            cancel_callback=self.detect_cancel_callback,
+            callback_group=self.callback_group,
+        )
+
+        # Session state for DetectClosest
+        self.session_active = False
+        self.session_target_class = None
+        self.session_require_depth = False
+        self.session_confirm_frames = 3
+        self.session_deadline = None
+        self.session_started_inspection = False
+        self.session_saved = False
+        self.session_closest_track_id = None
+        self.session_closest_stable_frames = 0
+        self.session_candidates = 0
+        self.session_closest_px_dist = float('inf')
+        self.session_depth_ready = False
+        self.session_result_info = None
+        self.current_goal_handle = None
         
         self.get_logger().info('Damaged Object Tracker Server initialized')
     
@@ -238,6 +267,142 @@ class DamagedObjectTrackerServer(Node):
         if self.servo_sub:
             self.destroy_subscription(self.servo_sub)
             self.servo_sub = None
+
+    # -------------------- Action: DetectClosest --------------------
+    def detect_goal_callback(self, goal_request):
+        if self.session_active:
+            self.get_logger().warn('DetectClosest goal rejected: session already active')
+            return GoalResponse.REJECT
+        if not goal_request.class_name:
+            self.get_logger().warn('DetectClosest goal rejected: empty class_name')
+            return GoalResponse.REJECT
+        return GoalResponse.ACCEPT
+
+    def detect_cancel_callback(self, goal_handle):
+        self.get_logger().info('DetectClosest cancel requested')
+        return CancelResponse.ACCEPT
+
+    def _clear_session(self):
+        self.session_active = False
+        self.session_target_class = None
+        self.session_require_depth = False
+        self.session_confirm_frames = 3
+        self.session_deadline = None
+        self.session_started_inspection = False
+        self.session_saved = False
+        self.session_closest_track_id = None
+        self.session_closest_stable_frames = 0
+        self.session_candidates = 0
+        self.session_closest_px_dist = float('inf')
+        self.session_depth_ready = False
+        self.session_result_info = None
+        self.current_goal_handle = None
+
+    def execute_detect_closest(self, goal_handle):
+        self.current_goal_handle = goal_handle
+        goal = goal_handle.request
+
+        # Extract parameters with defaults
+        class_name = goal.class_name
+        timeout_s = goal.timeout_s if goal.timeout_s > 0.0 else 20.0
+        confirm_frames = goal.confirm_frames if goal.confirm_frames > 0 else 3
+        require_depth = bool(goal.require_depth)
+
+        # Ensure inspection is active
+        if not self.inspection_active:
+            self._start_inspection()
+            self.session_started_inspection = True
+
+        # Activate session
+        self.session_active = True
+        self.session_target_class = class_name
+        self.session_require_depth = require_depth
+        self.session_confirm_frames = confirm_frames
+        self.session_deadline = self.get_clock().now().nanoseconds / 1e9 + timeout_s
+        self.session_saved = False
+        self.session_result_info = None
+        self.get_logger().info(
+            f"DetectClosest session started: class='{class_name}', timeout={timeout_s}s, confirm_frames={confirm_frames}, require_depth={require_depth}"
+        )
+
+        # Feedback loop until saved/timeout/cancel
+        rate_hz = 5.0
+        period = 1.0 / rate_hz
+        import time
+        while rclpy.ok():
+            # Handle cancel
+            if goal_handle.is_cancel_requested:
+                self.get_logger().info('DetectClosest canceled by client')
+                goal_handle.canceled()
+                if self.session_started_inspection:
+                    self._stop_inspection()
+                self._clear_session()
+                result = DetectClosest.Result()
+                result.success = False
+                result.reason = 'canceled'
+                result.saved_id = -1
+                result.bbox_x1 = result.bbox_y1 = result.bbox_x2 = result.bbox_y2 = 0
+                result.world_x = result.world_y = result.world_z = 0.0
+                result.image_file = ''
+                result.timestamp = 0.0
+                return result
+
+            # Publish feedback
+            fb = DetectClosest.Feedback()
+            fb.active_class = class_name
+            fb.closest_px_dist = float(self.session_closest_px_dist if self.session_closest_px_dist != float('inf') else -1.0)
+            fb.candidates = int(self.session_candidates)
+            fb.camera_moving = bool(self.camera_is_moving)
+            fb.depth_ready = bool(self.depth_image is not None)
+            goal_handle.publish_feedback(fb)
+
+            # Check success
+            if self.session_saved and self.session_result_info is not None:
+                info = self.session_result_info
+                result = DetectClosest.Result()
+                result.success = True
+                result.reason = 'saved'
+                result.saved_id = int(info.get('id', -1))
+                x1, y1, x2, y2 = info.get('bbox', (0, 0, 0, 0))
+                result.bbox_x1 = int(x1)
+                result.bbox_y1 = int(y1)
+                result.bbox_x2 = int(x2)
+                result.bbox_y2 = int(y2)
+                pos = info.get('world_position')
+                if pos:
+                    result.world_x = float(pos[0])
+                    result.world_y = float(pos[1])
+                    result.world_z = float(pos[2])
+                else:
+                    result.world_x = result.world_y = result.world_z = 0.0
+                result.image_file = info.get('image_file', '')
+                result.timestamp = float(info.get('timestamp', 0.0))
+
+                goal_handle.succeed()
+                if self.session_started_inspection:
+                    self._stop_inspection()
+                self._clear_session()
+                self.get_logger().info('DetectClosest session completed successfully')
+                return result
+
+            # Check timeout
+            now_s = self.get_clock().now().nanoseconds / 1e9
+            if now_s >= self.session_deadline:
+                self.get_logger().info('DetectClosest session timed out')
+                if self.session_started_inspection:
+                    self._stop_inspection()
+                self._clear_session()
+                result = DetectClosest.Result()
+                result.success = False
+                result.reason = 'timeout'
+                result.saved_id = -1
+                result.bbox_x1 = result.bbox_y1 = result.bbox_x2 = result.bbox_y2 = 0
+                result.world_x = result.world_y = result.world_z = 0.0
+                result.image_file = ''
+                result.timestamp = 0.0
+                return result
+
+            time.sleep(period)
     
     def _init_saved_positions_from_data(self):
         """Initialize the saved positions dictionary from loaded object data"""
@@ -605,16 +770,69 @@ class DamagedObjectTrackerServer(Node):
             
             # Update detection count
             self.detection_count += len(detected_objects)
-            
-            # Save new objects
-            if detected_objects:
-                new_objects_count = sum(1 for obj in detected_objects if obj['is_new'])
-                duplicate_count = sum(1 for obj in detected_objects if obj['is_duplicate'])
-                self.get_logger().info(
-                    f"Tracking {len(detected_objects)} objects, {new_objects_count} new, "
-                    f"{duplicate_count} duplicates, {len(self.unique_ids)} unique IDs total"
-                )
-                self.save_damaged_object_poses(detected_objects, frame)
+
+            # Action session path: select closest candidate of target class and save once
+            if self.session_active and self.session_target_class is not None:
+                candidates = [o for o in detected_objects if o['class_name'] == self.session_target_class]
+                self.session_candidates = len(candidates)
+                self.session_depth_ready = self.depth_image is not None
+
+                if candidates:
+                    h, w = frame.shape[:2]
+                    cx_img, cy_img = w // 2, h // 2
+
+                    def center_dist(obj):
+                        x1, y1, x2, y2 = obj['bbox']
+                        cx = (x1 + x2) // 2
+                        cy = (y1 + y2) // 2
+                        return math.hypot(cx - cx_img, cy - cy_img)
+
+                    # Respect require_depth; prefer non-duplicate; smallest distance
+                    filtered = [o for o in candidates if (o['object_position'] is not None or not self.session_require_depth)]
+                    if not filtered and not self.session_require_depth:
+                        filtered = candidates
+
+                    if filtered:
+                        filtered.sort(key=lambda o: (o['is_duplicate'], center_dist(o)))
+                        best = filtered[0]
+                        self.session_closest_px_dist = center_dist(best)
+
+                        # Stability check
+                        if self.session_closest_track_id == best['id']:
+                            self.session_closest_stable_frames += 1
+                        else:
+                            self.session_closest_track_id = best['id']
+                            self.session_closest_stable_frames = 1
+
+                        if (self.session_closest_stable_frames >= self.session_confirm_frames
+                                and not self.session_saved and not best['is_duplicate']):
+                            self.get_logger().info(
+                                f"DetectClosest selecting ID {best['id']} at {self.session_closest_px_dist:.1f}px for class '{self.session_target_class}'"
+                            )
+                            # Save only this object
+                            self.save_damaged_object_poses([best], frame)
+                            # Capture result info
+                            img_file = ''
+                            if hasattr(self, 'last_saved_object_info') and self.last_saved_object_info:
+                                img_file = self.last_saved_object_info.get('image_file', '')
+                            self.session_result_info = {
+                                'id': best['id'],
+                                'bbox': best['bbox'],
+                                'world_position': best.get('object_position'),
+                                'image_file': img_file,
+                                'timestamp': best['timestamp'],
+                            }
+                            self.session_saved = True
+            else:
+                # Original behavior: save all new objects
+                if detected_objects:
+                    new_objects_count = sum(1 for obj in detected_objects if obj['is_new'])
+                    duplicate_count = sum(1 for obj in detected_objects if obj['is_duplicate'])
+                    self.get_logger().info(
+                        f"Tracking {len(detected_objects)} objects, {new_objects_count} new, "
+                        f"{duplicate_count} duplicates, {len(self.unique_ids)} unique IDs total"
+                    )
+                    self.save_damaged_object_poses(detected_objects, frame)
             
             # Add status overlay
             cv2.putText(frame, f"INSPECTION: {'ACTIVE' if self.inspection_active else 'INACTIVE'}", 
@@ -631,6 +849,14 @@ class DamagedObjectTrackerServer(Node):
                 resolution_text = f"Color: {self.color_image_shape[1]}x{self.color_image_shape[0]}, Depth: {self.depth_image_shape[1]}x{self.depth_image_shape[0]}"
                 cv2.putText(frame, resolution_text, (20, 190),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+            # Overlay active session info
+            if self.session_active and self.session_target_class is not None:
+                cv2.putText(frame, f"TARGET: {self.session_target_class}", (20, 230),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                if self.session_closest_px_dist != float('inf'):
+                    cv2.putText(frame, f"Closest(px): {self.session_closest_px_dist:.1f}", (20, 270),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
             
             # Publish annotated image
             annotated_msg = self.cv_bridge.cv2_to_imgmsg(frame, encoding='bgr8')
@@ -643,7 +869,7 @@ class DamagedObjectTrackerServer(Node):
     def save_damaged_object_poses(self, detected_objects, frame):
         """Save new detected objects' images and poses to a JSON file"""
         new_objects = [obj for obj in detected_objects if obj['is_new']]
-        
+
         if not new_objects:
             return
         
@@ -711,6 +937,20 @@ class DamagedObjectTrackerServer(Node):
             
             self.objects_data.append(object_data)
             self.get_logger().info(f"Saved object ID {obj_id} to {img_path}")
+
+            # Cache info for action result
+            try:
+                self.last_saved_object_info = {
+                    'id': obj_id,
+                    'class_name': class_name,
+                    'image_file': img_filename,
+                    'timestamp': obj['timestamp'],
+                    'bbox': (x1, y1, x2, y2),
+                    'robot_position': obj['robot_position'],
+                    'world_position': object_position if object_position else None,
+                }
+            except Exception:
+                pass
         
         # Save updated JSON file
         with open(self.json_file, 'w') as f:

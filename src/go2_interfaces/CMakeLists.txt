@@ -17,6 +17,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/AprilTagDocking.action"
   "action/MoveToGoal.action"
   "action/WaypointFollower.action"
+  "action/DetectClosest.action"
 )
 
 
