@@ -31,7 +31,7 @@ class TFSubscriber(Node):
             r = transform.transform.rotation
 
             # Use translation + w component of quaternion (theta)
-            self.normalized = self.norm(t.x, t.y, t.z, r.z, r.w)
+            self.normalized = self.norm(t.x, t.y, t.z, r.z)
 
             self.get_logger().info(
                 f"Translation: x={t.x:.3f}, y={t.y:.3f}, z={t.z:.3f}\n"
@@ -39,8 +39,8 @@ class TFSubscriber(Node):
                 f"Normalized: {self.normalized:.6f}"
             )
 
-    def norm(self, x, y, z, rz, rw):
-        return np.linalg.norm([x, y, z, rz, rw])
+    def norm(self, x, y, z, rz):
+        return np.linalg.norm([x, y, z, rz])
 
     def check_reached_goal(self):
         """Check every 1.5 seconds if the robot has stopped moving."""
