@@ -18,6 +18,7 @@ import math
 from std_srvs.srv import SetBool, Trigger
 from threading import Lock
 from go2_interfaces.action import DetectClosest
+from std_msgs.msg import String as StringMsg
 
 class DamagedObjectTrackerServer(Node):
     def __init__(self):
@@ -53,6 +54,8 @@ class DamagedObjectTrackerServer(Node):
         
         # Create a publisher for annotated images
         self.annotated_image_pub = self.create_publisher(Image, '/annotated_image', 10)
+        # Publisher to move camera servos (absolute namespace to reach camera_servo node)
+        self.servo_move_pub = self.create_publisher(StringMsg, '/servo_move', 10)
         
         # Initialize CV bridge and YOLO model
         self.cv_bridge = CvBridge()
@@ -121,6 +124,17 @@ class DamagedObjectTrackerServer(Node):
         self.detection_count = 0
         self.start_time = None
 
+        # Parameters: two class groups and their target servo angles (tilt, pan)
+        # Classes are provided as comma-separated string parameters for simplicity.
+        self.declare_parameter('group_a_classes', '')
+        self.declare_parameter('group_b_classes', '')
+        self.declare_parameter('group_a_servo_tilt', 2000)
+        self.declare_parameter('group_a_servo_pan', 2000)
+        self.declare_parameter('group_b_servo_tilt', 2000)
+        self.declare_parameter('group_b_servo_pan', 2000)
+
+        self._load_class_servo_params()
+
         # Action server: DetectClosest (find one closest-to-center of a class)
         self.detect_action_server = ActionServer(
             self,
@@ -149,6 +163,63 @@ class DamagedObjectTrackerServer(Node):
         self.current_goal_handle = None
         
         self.get_logger().info('Damaged Object Tracker Server initialized')
+
+    def _load_class_servo_params(self):
+        """Load class grouping and servo targets from parameters"""
+        a_classes = self.get_parameter('group_a_classes').get_parameter_value().string_value
+        b_classes = self.get_parameter('group_b_classes').get_parameter_value().string_value
+        self.group_a_classes = set([c.strip() for c in a_classes.split(',') if c.strip()])
+        self.group_b_classes = set([c.strip() for c in b_classes.split(',') if c.strip()])
+        self.group_a_servo = (
+            int(self.get_parameter('group_a_servo_tilt').value),
+            int(self.get_parameter('group_a_servo_pan').value),
+        )
+        self.group_b_servo = (
+            int(self.get_parameter('group_b_servo_tilt').value),
+            int(self.get_parameter('group_b_servo_pan').value),
+        )
+        if self.group_a_classes:
+            self.get_logger().info(f"Group A: {sorted(self.group_a_classes)} -> servo {self.group_a_servo}")
+        if self.group_b_classes:
+            self.get_logger().info(f"Group B: {sorted(self.group_b_classes)} -> servo {self.group_b_servo}")
+
+    def set_camera_for_class(self, class_name):
+        """Command servos to a predefined angle depending on class group.
+
+        Returns True if a command was sent, False otherwise.
+        """
+        target = None
+        if class_name in self.group_a_classes:
+            target = self.group_a_servo
+            group = 'A'
+        elif class_name in self.group_b_classes:
+            target = self.group_b_servo
+            group = 'B'
+        else:
+            return False
+
+        tilt, pan = target
+        try:
+            msg = StringMsg()
+            msg.data = f"{tilt} {pan}"
+            self.servo_move_pub.publish(msg)
+            self.get_logger().info(f"Aligned camera for class '{class_name}' (Group {group}) -> tilt={tilt}, pan={pan}")
+            return True
+        except Exception as e:
+            self.get_logger().warn(f"Failed to publish servo move for class '{class_name}': {e}")
+            return False
+
+    def wait_for_camera_stable(self, max_wait_s=3.0):
+        """Wait briefly for servo motion to settle using existing motion gating state."""
+        start = self.get_clock().now().nanoseconds / 1e9
+        import time
+        # Give a small lead time after command
+        time.sleep(0.2)
+        while (self.servo_motion_detected or self.camera_is_moving):
+            now = self.get_clock().now().nanoseconds / 1e9
+            if now - start >= max_wait_s:
+                break
+            time.sleep(0.05)
     
     def start_stop_callback(self, request, response):
         """Service callback to start/stop inspection"""
@@ -324,6 +395,13 @@ class DamagedObjectTrackerServer(Node):
         self.get_logger().info(
             f"DetectClosest session started: class='{class_name}', timeout={timeout_s}s, confirm_frames={confirm_frames}, require_depth={require_depth}"
         )
+
+        # Try to align camera based on class group before searching
+        try:
+            if self.set_camera_for_class(class_name):
+                self.wait_for_camera_stable(max_wait_s=3.0)
+        except Exception:
+            pass
 
         # Feedback loop until saved/timeout/cancel
         rate_hz = 5.0
