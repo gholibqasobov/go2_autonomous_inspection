@@ -33,6 +33,22 @@ Verify it is available:
 - `ros2 action list`
 - `ros2 action info /damaged_object_tracker_server/detect_closest`
 
+### Optional: Auto-Align Camera Per Class
+You can define two class groups and a target servo angle for each group. When a goal starts, the server will publish a servo command to align the camera before detecting.
+
+Parameters (set via a launch/CLI or YAML):
+- `group_a_classes` (string): comma-separated class names for Group A, e.g. `"crack,hole"`
+- `group_b_classes` (string): comma-separated class names for Group B, e.g. `"corrosion,bolt"`
+- `group_a_servo_tilt` (int): servo tilt units for Group A (default `2000`)
+- `group_a_servo_pan` (int): servo pan units for Group A (default `2000`)
+- `group_b_servo_tilt` (int): servo tilt units for Group B (default `2000`)
+- `group_b_servo_pan` (int): servo pan units for Group B (default `2000`)
+
+Notes
+- The command is published to `/servo_move` and the server waits briefly for motion to settle before detection.
+- Servo units: 2000 ≈ 0°, 1000 ≈ −90°/left or +90°/up depending on axis, 3000 ≈ +90°/right or −90°/down.
+- The detector continues to gate while camera moves; this feature just presets the camera.
+
 ## Send an Action Goal
 Find one object of class `crack`, with 20s timeout, 3-frame stability requirement, depth optional:
 
@@ -100,4 +116,11 @@ Saved artifacts:
 - Check outputs:
   - JSON in `src/camera_inspection/damaged_objects/damaged_objects_data.json`
   - Images in `src/camera_inspection/damaged_objects/`
+- Example params file in repo:
+  - `src/camera_inspection/config/detect_closest_params.yaml`
 
+Run with the params file (from workspace root):
+- `ros2 run camera_inspection damaged_object_tracker_server --ros-args --params-file src/camera_inspection/config/detect_closest_params.yaml`
+
+After install (recommended path):
+- `ros2 run camera_inspection damaged_object_tracker_server --ros-args --params-file install/camera_inspection/share/camera_inspection/config/detect_closest_params.yaml`

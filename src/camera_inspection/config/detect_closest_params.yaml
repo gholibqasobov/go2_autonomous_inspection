@@ -1,0 +1,26 @@
+############################################################
+# DetectClosest server — class→servo presets (example)
+#
+# How to use:
+#   ros2 run camera_inspection damaged_object_tracker_server \
+#     --ros-args --params-file src/camera_inspection/config/detect_closest_params.yaml
+#
+# After install (recommended):
+#   ros2 run camera_inspection damaged_object_tracker_server \
+#     --ros-args --params-file install/camera_inspection/share/camera_inspection/config/detect_closest_params.yaml
+############################################################
+
+damaged_object_tracker_server:
+  ros__parameters:
+    # Group A: comma-separated class names
+    group_a_classes: "crack,hole"
+    # Target servo angles for Group A (servo units)
+    group_a_servo_tilt: 1500   # 1000..3000 (2000≈0°)
+    group_a_servo_pan: 2000    # 1000..3000 (2000≈0°)
+
+    # Group B: comma-separated class names
+    group_b_classes: "corrosion,bolt"
+    # Target servo angles for Group B (servo units)
+    group_b_servo_tilt: 2000
+    group_b_servo_pan: 2500
+
