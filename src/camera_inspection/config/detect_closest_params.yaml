@@ -13,14 +13,14 @@
 damaged_object_tracker_server:
   ros__parameters:
     # Group A: comma-separated class names
-    group_a_classes: "crack,hole"
+    group_a_classes: "light_on,light_off,half_working_light"
     # Target servo angles for Group A (servo units)
-    group_a_servo_tilt: 1500   # 1000..3000 (2000≈0°)
+    group_a_servo_tilt: 1000   # 1000..3000 (2000≈0°)
     group_a_servo_pan: 2000    # 1000..3000 (2000≈0°)
 
     # Group B: comma-separated class names
-    group_b_classes: "corrosion,bolt"
+    group_b_classes: "crack,fire_extinguisher,cabinet,algae,peeling,stain,moisture"
     # Target servo angles for Group B (servo units)
-    group_b_servo_tilt: 2000
-    group_b_servo_pan: 2500
+    group_b_servo_tilt: 1500
+    group_b_servo_pan: 2000
 
