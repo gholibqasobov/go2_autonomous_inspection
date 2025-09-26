@@ -70,8 +70,11 @@ class WaypointFollowerServer(Node):
 
     def check_reached_goal(self):
         """Check every 1.5 seconds if the robot has stopped moving."""
+        if not self.goal_active:
+            return  # Ignore check unless a goal is active
+
         if self.normalized is None:
-            return  
+            return
 
         if self.last_value is None:
             self.last_value = self.normalized
@@ -81,7 +84,6 @@ class WaypointFollowerServer(Node):
             if not self.goal_reached:
                 self.get_logger().info("Robot reached goal position.")
                 self.goal_reached = True
-                # Signal the event to wake up the waiting coroutine
                 self._goal_reached_event.set()
         else:
             self.last_value = self.normalized
@@ -103,16 +105,18 @@ class WaypointFollowerServer(Node):
         self._goal_handle = goal_handle
         self._goal_canceled = False
         self.goal_reached = False
+        self.goal_active = True  # <--- Activate the goal tracking
 
         result = WaypointFollower.Result()
 
         self.send_auto_mode_joy()
-        time.sleep(2.0)  # blocking sleep
+        time.sleep(2.0)
 
         if goal_handle.is_cancel_requested:
             self.get_logger().info("Goal canceled")
             goal_handle.canceled()
             result.success = False
+            self.goal_active = False  # <--- Reset here too
             return result
 
         waypoint = goal_handle.request.waypoint
@@ -128,12 +132,14 @@ class WaypointFollowerServer(Node):
                 self.get_logger().info("Goal canceled while waiting")
                 goal_handle.canceled()
                 result.success = False
+                self.goal_active = False  # <--- Reset here too
                 return result
-            rclpy.spin_once(self, timeout_sec=0.1)  # Process incoming TF msgs, timer callbacks, etc.
+            rclpy.spin_once(self, timeout_sec=0.1)
 
         self.get_logger().info("Waypoint execution complete")
         result.success = True
         goal_handle.succeed()
+        self.goal_active = False  # <--- Reset here
         return result
 
     def send_auto_mode_joy(self):
