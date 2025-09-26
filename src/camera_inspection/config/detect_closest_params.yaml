@@ -44,6 +44,14 @@ damaged_object_tracker_server:
         {"tilt": 1800, "pan": 2000, "wait_s": 3.0},
         {"tilt": 1500, "pan": 2000, "wait_s": 3.0},
         {"tilt": 1300, "pan": 2000, "wait_s": 3.0},
+        {"tilt": 2000, "pan": 1500, "wait_s": 3.0},
+        {"tilt": 1800, "pan": 1500, "wait_s": 3.0},
+        {"tilt": 1500, "pan": 1500, "wait_s": 3.0},
+        {"tilt": 1300, "pan": 1500, "wait_s": 3.0},
+        {"tilt": 2000, "pan": 2500, "wait_s": 3.0},
+        {"tilt": 1800, "pan": 2500, "wait_s": 3.0},
+        {"tilt": 1500, "pan": 2500, "wait_s": 3.0},
+        {"tilt": 1300, "pan": 2500, "wait_s": 3.0},
         {"tilt": 2000, "pan": 2000, "wait_s": 2.0}
       ]
     # Set to true to continuously loop through the sequences until success/timeout/cancel

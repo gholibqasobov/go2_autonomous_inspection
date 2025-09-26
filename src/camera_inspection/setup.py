@@ -31,6 +31,7 @@ setup(
             'damaged_object_tracker = camera_inspection.damaged_object_tracker:main',
             'damaged_object_tracker_server = camera_inspection.damaged_object_tracker_server:main',
             'damaged_object_tracker_client = camera_inspection.damaged_object_tracker_client:main',
+            'detect_closest_client = camera_inspection.detect_closest_client:main',
             'damaged_objects_rviz_publisher = camera_inspection.damaged_objects_rviz_publisher:main',
             'elevator_white_coefficient = camera_inspection.elevator_white_coefficient:main',
             'elevator_red_coefficient = camera_inspection.elevator_red_coefficient:main',
