@@ -1,0 +1,8 @@
+# Goal
+float32 theta
+---
+# Result
+bool success
+---
+# Feedback
+string current_theta
