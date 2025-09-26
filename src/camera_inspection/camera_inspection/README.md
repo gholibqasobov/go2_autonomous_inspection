@@ -53,5 +53,5 @@ ros2 run camera_inspection damaged_object_tracker_server --ros-args --params-fil
 ```
 
 ```
-ros2 action send_goal /damaged_object_tracker_server/detect_closest go2_interfaces/action/DetectClosest "{class_name: 'crack', timeout_s: 20.0, confirm_frames: 3, require_depth: false}"
+ros2 run camera_inspection damaged_object_tracker_client --class light_on --timeout 30 --confirm 3
 ```
