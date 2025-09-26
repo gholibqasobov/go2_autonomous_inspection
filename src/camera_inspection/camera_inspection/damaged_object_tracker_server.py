@@ -361,6 +361,18 @@ class DamagedObjectTrackerServer(Node):
                 while waited < remain:
                     if should_stop():
                         return True
+                    # Emit lightweight feedback while scanning poses
+                    try:
+                        if self.current_goal_handle:
+                            fb = DetectClosest.Feedback()
+                            fb.active_class = class_name
+                            fb.closest_px_dist = float(self.session_closest_px_dist if self.session_closest_px_dist != float('inf') else -1.0)
+                            fb.candidates = int(self.session_candidates)
+                            fb.camera_moving = bool(self.camera_is_moving)
+                            fb.depth_ready = bool(self.depth_image is not None)
+                            self.current_goal_handle.publish_feedback(fb)
+                    except Exception:
+                        pass
                     time.sleep(min(slice_s, remain - waited))
                     waited += slice_s
             if not self.sequence_repeat:
@@ -551,6 +563,35 @@ class DamagedObjectTrackerServer(Node):
                     self.wait_for_camera_stable(max_wait_s=3.0)
         except Exception as e:
             self.get_logger().warn(f"Pre-scan alignment/sequence failed: {e}")
+
+        # If object already saved during pre-scan, short-circuit and return
+        if self.session_saved and self.session_result_info is not None:
+            info = self.session_result_info
+            result = DetectClosest.Result()
+            result.success = True
+            result.reason = 'saved'
+            result.saved_id = int(info.get('id', -1))
+            x1, y1, x2, y2 = info.get('bbox', (0, 0, 0, 0))
+            result.bbox_x1 = int(x1)
+            result.bbox_y1 = int(y1)
+            result.bbox_x2 = int(x2)
+            result.bbox_y2 = int(y2)
+            pos = info.get('world_position')
+            if pos:
+                result.world_x = float(pos[0])
+                result.world_y = float(pos[1])
+                result.world_z = float(pos[2])
+            else:
+                result.world_x = result.world_y = result.world_z = 0.0
+            result.image_file = info.get('image_file', '')
+            result.timestamp = float(info.get('timestamp', 0.0))
+
+            goal_handle.succeed()
+            if self.session_started_inspection:
+                self._stop_inspection()
+            self._clear_session()
+            self.get_logger().info('DetectClosest session completed during pre-scan')
+            return result
 
         # Feedback loop until saved/timeout/cancel
         rate_hz = 5.0
