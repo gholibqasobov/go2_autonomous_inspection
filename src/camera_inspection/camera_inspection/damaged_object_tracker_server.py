@@ -132,8 +132,15 @@ class DamagedObjectTrackerServer(Node):
         self.declare_parameter('group_a_servo_pan', 2000)
         self.declare_parameter('group_b_servo_tilt', 2000)
         self.declare_parameter('group_b_servo_pan', 2000)
+        # Optional: per-class and per-group multi-step camera motion sequences encoded as JSON
+        # Examples provided in detect_closest_params.yaml under camera_sequences_json and group_*_sequence_json
+        self.declare_parameter('camera_sequences_json', '')
+        self.declare_parameter('camera_sequence_repeat', False)
+        self.declare_parameter('group_a_sequence_json', '')
+        self.declare_parameter('group_b_sequence_json', '')
 
         self._load_class_servo_params()
+        self._load_camera_sequences()
 
         # Action server: DetectClosest (find one closest-to-center of a class)
         self.detect_action_server = ActionServer(
@@ -183,6 +190,95 @@ class DamagedObjectTrackerServer(Node):
         if self.group_b_classes:
             self.get_logger().info(f"Group B: {sorted(self.group_b_classes)} -> servo {self.group_b_servo}")
 
+    def _load_camera_sequences(self):
+        """Load optional per-class and per-group motion sequences from parameters.
+
+        Format (JSON string):
+          {
+            "crack": [
+              {"tilt": 2100, "pan": 2000, "wait_s": 2.0},
+              {"tilt": 2000, "pan": 1800, "wait_s": 2.0},
+              {"tilt": 2200, "pan": 2200, "wait_s": 2.0}
+            ],
+            "light_on": [ ... ]
+          }
+        """
+        self.camera_sequences = {}
+        self.group_sequences = {'A': None, 'B': None}
+        self.sequence_repeat = bool(self.get_parameter('camera_sequence_repeat').value)
+
+        def parse_steps_list(steps, label):
+            if not isinstance(steps, list):
+                self.get_logger().warn(f"Sequence for {label} ignored: not a list")
+                return None
+            norm_steps = []
+            for i, st in enumerate(steps):
+                if not isinstance(st, dict):
+                    self.get_logger().warn(f"Step {i} for {label} ignored: not an object")
+                    continue
+                try:
+                    tilt = int(st.get('tilt'))
+                    pan = int(st.get('pan'))
+                    wait_s = float(st.get('wait_s', 1.0))
+                    norm_steps.append({'tilt': tilt, 'pan': pan, 'wait_s': wait_s})
+                except Exception:
+                    self.get_logger().warn(f"Invalid fields in step {i} for {label}")
+            return norm_steps if norm_steps else None
+
+        # Per-class mapping
+        raw_class = self.get_parameter('camera_sequences_json').get_parameter_value().string_value
+        if raw_class:
+            try:
+                parsed = json.loads(raw_class)
+                if not isinstance(parsed, dict):
+                    self.get_logger().warn('camera_sequences_json must be a JSON object mapping class->steps[]')
+                else:
+                    for cls, steps in parsed.items():
+                        norm_steps = parse_steps_list(steps, f"class '{cls}'")
+                        if norm_steps:
+                            self.camera_sequences[cls] = norm_steps
+                    if self.camera_sequences:
+                        classes = ', '.join(sorted(self.camera_sequences.keys()))
+                        self.get_logger().info(f"Loaded camera sequences for classes: {classes} (repeat={self.sequence_repeat})")
+            except Exception as e:
+                self.get_logger().warn(f"Failed to parse camera_sequences_json: {e}")
+
+        # Per-group sequences
+        raw_ga = self.get_parameter('group_a_sequence_json').get_parameter_value().string_value
+        if raw_ga:
+            try:
+                steps = json.loads(raw_ga)
+                norm = parse_steps_list(steps, 'group A')
+                if norm:
+                    self.group_sequences['A'] = norm
+                    self.get_logger().info("Loaded camera sequence for Group A")
+            except Exception as e:
+                self.get_logger().warn(f"Failed to parse group_a_sequence_json: {e}")
+
+        raw_gb = self.get_parameter('group_b_sequence_json').get_parameter_value().string_value
+        if raw_gb:
+            try:
+                steps = json.loads(raw_gb)
+                norm = parse_steps_list(steps, 'group B')
+                if norm:
+                    self.group_sequences['B'] = norm
+                    self.get_logger().info("Loaded camera sequence for Group B")
+            except Exception as e:
+                self.get_logger().warn(f"Failed to parse group_b_sequence_json: {e}")
+
+    def _sequence_for_class(self, class_name):
+        """Return steps list to use for a given class.
+
+        Order of precedence: per-class > per-group > None.
+        """
+        if class_name in self.camera_sequences:
+            return self.camera_sequences[class_name]
+        if class_name in self.group_a_classes and self.group_sequences['A'] is not None:
+            return self.group_sequences['A']
+        if class_name in self.group_b_classes and self.group_sequences['B'] is not None:
+            return self.group_sequences['B']
+        return None
+
     def set_camera_for_class(self, class_name):
         """Command servos to a predefined angle depending on class group.
 
@@ -220,6 +316,56 @@ class DamagedObjectTrackerServer(Node):
             if now - start >= max_wait_s:
                 break
             time.sleep(0.05)
+
+    def run_camera_sequence(self, class_name, deadline_s=None):
+        """Run the configured camera motion sequence for a class, if present.
+
+        Honors action cancel requests, session completion, and overall deadline.
+        Returns True if a sequence was run, False if none configured.
+        """
+        steps = self._sequence_for_class(class_name)
+        if not steps:
+            return False
+
+        def should_stop():
+            if self.current_goal_handle and self.current_goal_handle.is_cancel_requested:
+                return True
+            if self.session_saved:
+                return True
+            if deadline_s is not None:
+                now_s = self.get_clock().now().nanoseconds / 1e9
+                if now_s >= deadline_s:
+                    return True
+            return False
+
+        import time
+        while True:
+            for st in steps:
+                if should_stop():
+                    return True
+                try:
+                    msg = StringMsg()
+                    msg.data = f"{st['tilt']} {st['pan']}"
+                    self.servo_move_pub.publish(msg)
+                    self.get_logger().info(
+                        f"Sequence move for '{class_name}': tilt={st['tilt']}, pan={st['pan']} (wait {st['wait_s']:.2f}s)"
+                    )
+                except Exception as e:
+                    self.get_logger().warn(f"Failed to publish sequence servo move: {e}")
+                # Wait for mechanical settle
+                self.wait_for_camera_stable(max_wait_s=min(3.0, st['wait_s']))
+                # Let perception run at this pose, check periodically for stop conditions
+                remain = max(0.0, float(st['wait_s']))
+                slice_s = 0.1
+                waited = 0.0
+                while waited < remain:
+                    if should_stop():
+                        return True
+                    time.sleep(min(slice_s, remain - waited))
+                    waited += slice_s
+            if not self.sequence_repeat:
+                break
+        return True
     
     def start_stop_callback(self, request, response):
         """Service callback to start/stop inspection"""
@@ -396,12 +542,15 @@ class DamagedObjectTrackerServer(Node):
             f"DetectClosest session started: class='{class_name}', timeout={timeout_s}s, confirm_frames={confirm_frames}, require_depth={require_depth}"
         )
 
-        # Try to align camera based on class group before searching
+        # Pre-scan: either run a per-class sequence or a single alignment
         try:
-            if self.set_camera_for_class(class_name):
-                self.wait_for_camera_stable(max_wait_s=3.0)
-        except Exception:
-            pass
+            # Compute deadline for pre-scan as session deadline to avoid overruns
+            ran_sequence = self.run_camera_sequence(class_name, deadline_s=self.session_deadline)
+            if not ran_sequence:
+                if self.set_camera_for_class(class_name):
+                    self.wait_for_camera_stable(max_wait_s=3.0)
+        except Exception as e:
+            self.get_logger().warn(f"Pre-scan alignment/sequence failed: {e}")
 
         # Feedback loop until saved/timeout/cancel
         rate_hz = 5.0

@@ -24,3 +24,24 @@ damaged_object_tracker_server:
     group_b_servo_tilt: 1500
     group_b_servo_pan: 2000
 
+    # Optional: Per-class multi-step motion sequences
+    # camera_sequences_json: |
+    #   { "crack": [ {"tilt": 2100, "pan": 2000, "wait_s": 2.0} ] }
+
+    # Optional: Per-group multi-step motion sequences
+    # Provide JSON arrays (list of steps) for each group. If both per-class and per-group
+    # are configured for a class, per-class takes precedence. If none are set, the node
+    # falls back to single-position alignment via group_*_servo_*.
+    group_a_sequence_json: |
+      [
+        {"tilt": 1000, "pan": 2000, "wait_s": 5.0}
+      ]
+    group_b_sequence_json: |
+      [
+        {"tilt": 2000, "pan": 2000, "wait_s": 3.0},
+        {"tilt": 1800, "pan": 2000, "wait_s": 3.0},
+        {"tilt": 1500, "pan": 2000, "wait_s": 3.0},
+        {"tilt": 1300, "pan": 2000, "wait_s": 3.0}
+      ]
+    # Set to true to continuously loop through the sequences until success/timeout/cancel
+    camera_sequence_repeat: false
