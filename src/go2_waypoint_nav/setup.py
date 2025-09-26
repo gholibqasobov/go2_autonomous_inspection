@@ -31,6 +31,7 @@ setup(
             'track_waypoint_reached = go2_waypoint_nav.track_waypoint_reached:main',
             'rotate_robot = go2_waypoint_nav.rotate_robot:main',
             'rotate_robot_server = go2_waypoint_nav.rotate_robot_server:main',
+            'rotate_robot_client = go2_waypoint_nav.rotate_robot_client:main',
         ],
     },
 )
