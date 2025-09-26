@@ -34,14 +34,17 @@ damaged_object_tracker_server:
     # falls back to single-position alignment via group_*_servo_*.
     group_a_sequence_json: |
       [
-        {"tilt": 1000, "pan": 2000, "wait_s": 5.0}
+        {"tilt": 1000, "pan": 2000, "wait_s": 5.0},
+        {"tilt": 1300, "pan": 2000, "wait_s": 5.0},
+        {"tilt": 2000, "pan": 2000, "wait_s": 2.0}
       ]
     group_b_sequence_json: |
       [
         {"tilt": 2000, "pan": 2000, "wait_s": 3.0},
         {"tilt": 1800, "pan": 2000, "wait_s": 3.0},
         {"tilt": 1500, "pan": 2000, "wait_s": 3.0},
-        {"tilt": 1300, "pan": 2000, "wait_s": 3.0}
+        {"tilt": 1300, "pan": 2000, "wait_s": 3.0},
+        {"tilt": 2000, "pan": 2000, "wait_s": 2.0}
       ]
     # Set to true to continuously loop through the sequences until success/timeout/cancel
     camera_sequence_repeat: false
