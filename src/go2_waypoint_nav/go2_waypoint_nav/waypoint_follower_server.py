@@ -55,6 +55,7 @@ class WaypointFollowerServer(Node):
 
         self._goal_handle = None
         self._goal_canceled = False
+        self.goal_active = False
 
     """================================================================"""
     def tf_callback(self, msg: TFMessage):
