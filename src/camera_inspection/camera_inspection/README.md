@@ -31,8 +31,8 @@ ros2 service call /damaged_object_tracker_server/get_status std_srvs/srv/Trigger
 Stop inspection
 ros2 service call /damaged_object_tracker_server/start_inspection std_srvs/srv/SetBool "{data: false}"
 
-Run demo
-ros2 run camera_inspection damaged_object_tracker_client demo 30
+Run action client (example)
+ros2 run camera_inspection damaged_object_tracker_client --class crack --timeout 30 --confirm 3
 
 
 ros2 run  camera_inspection damaged_object_tracker_server 
