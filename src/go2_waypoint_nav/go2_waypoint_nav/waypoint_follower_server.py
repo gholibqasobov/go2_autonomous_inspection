@@ -7,7 +7,7 @@ from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import Joy
 import time
 
-from go2_interfaces.action import WaypointFollower  # Your custom action
+from go2_interfaces.action import WaypointFollower 
 
 from tf2_msgs.msg import TFMessage
 import numpy as np
