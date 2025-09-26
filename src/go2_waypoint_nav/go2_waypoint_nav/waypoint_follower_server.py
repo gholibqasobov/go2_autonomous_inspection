@@ -46,7 +46,7 @@ class WaypointFollowerServer(Node):
         self.goal_active = False
 
         # Timer to check every 1.5 seconds
-        self.timer = self.create_timer(1.5, self.check_reached_goal)
+        self.timer = self.create_timer(2.5, self.check_reached_goal)
 
         self.goal_pub = self.create_publisher(PointStamped, 'way_point', 10)
         self.joy_pub = self.create_publisher(Joy, 'joy', 10)
