@@ -143,9 +143,9 @@ def main(args=None):
 
     # Example sequence combining both actions
     sequence = [
-        {'type': 'waypoint_follower', 'x': 1.0, 'y': 2.0, 'z': 0.0},
+        {'type': 'waypoint_follower', 'x': 2.0, 'y': -2.0, 'z': 0.0},
         {'type': 'rotate_robot', 'theta': 0.5},
-        {'type': 'waypoint_follower', 'x': 3.0, 'y': 1.0, 'z': 0.0},
+        {'type': 'waypoint_follower', 'x': 6.0, 'y': -7.0, 'z': 0.0},
         {'type': 'rotate_robot', 'theta': -0.5}
     ]
 

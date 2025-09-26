@@ -8,11 +8,8 @@ from sensor_msgs.msg import Joy
 import time
 
 from go2_interfaces.action import WaypointFollower 
-
 from tf2_msgs.msg import TFMessage
 import numpy as np
-
-import asyncio
 
 class WaypointFollowerServer(Node):
 
@@ -44,27 +41,21 @@ class WaypointFollowerServer(Node):
         self.last_value = None
 
         self.goal_reached = False
-        self._goal_reached_event = asyncio.Event()
-
-        # Timer to check every 1.5 seconds
-        self.timer = self.create_timer(1.5, self.check_reached_goal)
-
-
-        self.goal_pub = self.create_publisher(PointStamped, 'way_point', 10)
-        self.joy_pub = self.create_publisher(Joy, 'joy', 10)
-
         self._goal_handle = None
         self._goal_canceled = False
         self.goal_active = False
 
-    """================================================================"""
+        # Timer to check every 1.5 seconds
+        self.timer = self.create_timer(1.5, self.check_reached_goal)
+
+        self.goal_pub = self.create_publisher(PointStamped, 'way_point', 10)
+        self.joy_pub = self.create_publisher(Joy, 'joy', 10)
+
     def tf_callback(self, msg: TFMessage):
         for transform in msg.transforms:
             t = transform.transform.translation
             r = transform.transform.rotation
-
             self.normalized = self.norm(t.x, t.y, t.z, r.z)
-
 
     def norm(self, x, y, z, rz):
         return np.linalg.norm([x, y, z, rz])
@@ -72,7 +63,7 @@ class WaypointFollowerServer(Node):
     def check_reached_goal(self):
         """Check every 1.5 seconds if the robot has stopped moving."""
         if not self.goal_active:
-            return  # Ignore check unless a goal is active
+            return
 
         if self.normalized is None:
             return
@@ -85,16 +76,19 @@ class WaypointFollowerServer(Node):
             if not self.goal_reached:
                 self.get_logger().info("Robot reached goal position.")
                 self.goal_reached = True
-                self._goal_reached_event.set()
         else:
             self.last_value = self.normalized
             if self.goal_reached:
                 self.goal_reached = False
-                self._goal_reached_event.clear()
-    """================================================================"""
-            
+
     def goal_callback(self, goal_request):
         self.get_logger().info(f"Received goal request: {goal_request.waypoint}")
+        
+        # Reject new goal if one is already active
+        if self.goal_active:
+            self.get_logger().warn("Goal rejected: Another goal is already active")
+            return GoalResponse.REJECT
+        
         return GoalResponse.ACCEPT
 
     def cancel_callback(self, goal_handle):
@@ -103,45 +97,76 @@ class WaypointFollowerServer(Node):
         return CancelResponse.ACCEPT
 
     def execute_callback(self, goal_handle):
+        # Reset state for new goal
+        self._reset_goal_state()
+        
         self._goal_handle = goal_handle
+        self.goal_active = True
         self._goal_canceled = False
         self.goal_reached = False
-        self.goal_active = True  # <--- Activate the goal tracking
 
         result = WaypointFollower.Result()
 
-        self.send_auto_mode_joy()
-        time.sleep(2.0)
+        try:
+            # Send auto mode
+            self.send_auto_mode_joy()
+            time.sleep(2.0)
 
-        if goal_handle.is_cancel_requested:
-            self.get_logger().info("Goal canceled")
-            goal_handle.canceled()
+            # Check if canceled before proceeding
+            if goal_handle.is_cancel_requested:
+                self.get_logger().info("Goal canceled before execution")
+                result.success = False
+                return result
+
+            # Publish waypoint
+            waypoint = goal_handle.request.waypoint
+            self.goal_pub.publish(waypoint)
+            self.get_logger().info(f"Published goal {waypoint}")
+
+            # Send initial feedback
+            feedback = WaypointFollower.Feedback()
+            feedback.current_position = f"Moving to goal: {waypoint}"
+            goal_handle.publish_feedback(feedback)
+
+            # Wait for goal completion or cancellation
+            while rclpy.ok() and self.goal_active:
+                if goal_handle.is_cancel_requested:
+                    self.get_logger().info("Goal canceled during execution")
+                    result.success = False
+                    goal_handle.canceled()
+                    return result
+
+                if self.goal_reached:
+                    self.get_logger().info("Waypoint execution complete")
+                    result.success = True
+                    goal_handle.succeed()
+                    return result
+
+                # Update feedback periodically
+                feedback.current_position = f"Moving to goal: {waypoint}"
+                goal_handle.publish_feedback(feedback)
+                
+                time.sleep(0.1)  # Small delay to prevent busy waiting
+
+            # If we exit the loop without goal completion
             result.success = False
-            self.goal_active = False  # <--- Reset here too
             return result
 
-        waypoint = goal_handle.request.waypoint
-        self.goal_pub.publish(waypoint)
-        self.get_logger().info(f"Published goal {waypoint}")
+        except Exception as e:
+            self.get_logger().error(f"Error during goal execution: {str(e)}")
+            result.success = False
+            return result
+        finally:
+            # Always reset goal state when execution ends
+            self._reset_goal_state()
 
-        feedback = WaypointFollower.Feedback()
-        feedback.current_position = f"Moving to goal: {waypoint}"
-        goal_handle.publish_feedback(feedback)
-
-        while not self.goal_reached:
-            if goal_handle.is_cancel_requested:
-                self.get_logger().info("Goal canceled while waiting")
-                goal_handle.canceled()
-                result.success = False
-                self.goal_active = False  # <--- Reset here too
-                return result
-            rclpy.spin_once(self, timeout_sec=0.1)
-
-        self.get_logger().info("Waypoint execution complete")
-        result.success = True
-        goal_handle.succeed()
-        self.goal_active = False  # <--- Reset here
-        return result
+    def _reset_goal_state(self):
+        """Reset all goal-related state variables"""
+        self.goal_active = False
+        self._goal_canceled = False
+        self.goal_reached = False
+        self.last_value = None
+        self._goal_handle = None
 
     def send_auto_mode_joy(self):
         joy_msg = Joy()

@@ -122,7 +122,7 @@ class RotateRobotActionServer(Node):
                 return result
 
             # Check if we've reached the goal (using same tolerance as your working code)
-            if np.isclose(self.current_theta, self.goal_theta, atol=1e-2):
+            if np.isclose(self.current_theta, self.goal_theta, atol=0.02):
                 # Stop the robot
                 self.send_joy(0, 0.0)
                 self.get_logger().info("Robot reached goal orientation")
