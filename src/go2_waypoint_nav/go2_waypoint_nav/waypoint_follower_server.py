@@ -9,6 +9,10 @@ import time
 
 from go2_interfaces.action import WaypointFollower  # Your custom action
 
+from tf2_msgs.msg import TFMessage
+import numpy as np
+
+import asyncio
 
 class WaypointFollowerServer(Node):
 
@@ -27,11 +31,64 @@ class WaypointFollowerServer(Node):
             callback_group=self.callback_group
         )
 
+        # TF subscriber
+        self.tf_subscriber = self.create_subscription(
+            TFMessage,
+            '/tf',
+            self.tf_callback,
+            10
+        )
+
+        # Store current and last norm
+        self.normalized = None
+        self.last_value = None
+
+        self.goal_reached = False
+        self._goal_reached_event = asyncio.Event()
+
+        # Timer to check every 1.5 seconds
+        self.timer = self.create_timer(1.5, self.check_reached_goal)
+
+
         self.goal_pub = self.create_publisher(PointStamped, 'way_point', 10)
         self.joy_pub = self.create_publisher(Joy, 'joy', 10)
 
         self._goal_handle = None
         self._goal_canceled = False
+
+    """================================================================"""
+    def tf_callback(self, msg: TFMessage):
+        for transform in msg.transforms:
+            t = transform.transform.translation
+            r = transform.transform.rotation
+
+            self.normalized = self.norm(t.x, t.y, t.z, r.z)
+
+
+    def norm(self, x, y, z, rz):
+        return np.linalg.norm([x, y, z, rz])
+
+    def check_reached_goal(self):
+        """Check every 1.5 seconds if the robot has stopped moving."""
+        if self.normalized is None:
+            return  
+
+        if self.last_value is None:
+            self.last_value = self.normalized
+            return
+
+        if np.isclose(self.last_value, self.normalized, atol=1e-6):
+            if not self.goal_reached:
+                self.get_logger().info("Robot reached goal position.")
+                self.goal_reached = True
+                # Signal the event to wake up the waiting coroutine
+                self._goal_reached_event.set()
+        else:
+            self.last_value = self.normalized
+            if self.goal_reached:
+                self.goal_reached = False
+                self._goal_reached_event.clear()
+    """================================================================"""
             
     def goal_callback(self, goal_request):
         self.get_logger().info(f"Received goal request: {goal_request.waypoint}")
@@ -42,14 +99,15 @@ class WaypointFollowerServer(Node):
         self._goal_canceled = True
         return CancelResponse.ACCEPT
 
-    async def execute_callback(self, goal_handle):
+    def execute_callback(self, goal_handle):
         self._goal_handle = goal_handle
         self._goal_canceled = False
+        self.goal_reached = False
 
         result = WaypointFollower.Result()
 
         self.send_auto_mode_joy()
-        time.sleep(2.0)  # change to 1 if robot starts moving forward before waypoint
+        time.sleep(2.0)  # blocking sleep
 
         if goal_handle.is_cancel_requested:
             self.get_logger().info("Goal canceled")
@@ -57,9 +115,7 @@ class WaypointFollowerServer(Node):
             result.success = False
             return result
 
-        waypoint = PointStamped()
         waypoint = goal_handle.request.waypoint
-
         self.goal_pub.publish(waypoint)
         self.get_logger().info(f"Published goal {waypoint}")
 
@@ -67,8 +123,13 @@ class WaypointFollowerServer(Node):
         feedback.current_position = f"Moving to goal: {waypoint}"
         goal_handle.publish_feedback(feedback)
 
-        
-        time.sleep(15.0) # wait till robot reaches waypoint
+        while not self.goal_reached:
+            if goal_handle.is_cancel_requested:
+                self.get_logger().info("Goal canceled while waiting")
+                goal_handle.canceled()
+                result.success = False
+                return result
+            rclpy.spin_once(self, timeout_sec=0.1)  # Process incoming TF msgs, timer callbacks, etc.
 
         self.get_logger().info("Waypoint execution complete")
         result.success = True
