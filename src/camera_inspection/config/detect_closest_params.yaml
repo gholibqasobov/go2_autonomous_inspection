@@ -1,0 +1,73 @@
+############################################################
+# DetectClosest server — class→servo presets (example)
+#
+# How to use:
+#   ros2 run camera_inspection damaged_object_tracker_server \
+#     --ros-args --params-file src/camera_inspection/config/detect_closest_params.yaml
+#
+# After install (recommended):
+#   ros2 run camera_inspection damaged_object_tracker_server \
+#     --ros-args --params-file install/camera_inspection/share/camera_inspection/config/detect_closest_params.yaml
+############################################################
+
+damaged_object_tracker_server:
+  ros__parameters:
+    # --- Detection/motion gating tuning ---
+    # Set true to allow detections even while camera is moving
+    disable_motion_gating: false
+    # YOLO confidence threshold
+    conf_thresh: 0.5
+    # Frame-diff motion detection: number of pixels above diff threshold to consider motion
+    frame_stationary_thresh: 3000
+    # Per-pixel difference threshold (0..255)
+    frame_diff_thresh: 20
+    # Servo motion detection thresholds
+    servo_motion_thresh_rad: 0.02
+    servo_stable_frames: 5
+    # Minimum distance (meters) to consider a detection duplicate of an existing saved object
+    proximity_thresh_m: 0.3
+
+    # Group A: comma-separated class names
+    group_a_classes: "light_on,light_off,half_working_light"
+    # Target servo angles for Group A (servo units)
+    group_a_servo_tilt: 1000   # 1000..3000 (2000≈0°)
+    group_a_servo_pan: 2000    # 1000..3000 (2000≈0°)
+
+    # Group B: comma-separated class names
+    group_b_classes: "crack,fire_extinguisher,cabinet,algae,peeling,stain,moisture"
+    # Target servo angles for Group B (servo units)
+    group_b_servo_tilt: 1500
+    group_b_servo_pan: 2000
+
+    # Optional: Per-class multi-step motion sequences
+    # camera_sequences_json: |
+    #   { "crack": [ {"tilt": 2100, "pan": 2000, "wait_s": 2.0} ] }
+
+    # Optional: Per-group multi-step motion sequences
+    # Provide JSON arrays (list of steps) for each group. If both per-class and per-group
+    # are configured for a class, per-class takes precedence. If none are set, the node
+    # falls back to single-position alignment via group_*_servo_*.
+    group_a_sequence_json: |
+      [
+        {"tilt": 1000, "pan": 2000, "wait_s": 5.0},
+        {"tilt": 1300, "pan": 2000, "wait_s": 5.0},
+        {"tilt": 2000, "pan": 2000, "wait_s": 2.0}
+      ]
+    group_b_sequence_json: |
+      [
+        {"tilt": 2000, "pan": 2000, "wait_s": 3.0},
+        {"tilt": 1800, "pan": 2000, "wait_s": 3.0},
+        {"tilt": 1500, "pan": 2000, "wait_s": 3.0},
+        {"tilt": 1300, "pan": 2000, "wait_s": 3.0},
+        {"tilt": 2000, "pan": 1350, "wait_s": 3.0},
+        {"tilt": 1800, "pan": 1350, "wait_s": 3.0},
+        {"tilt": 1500, "pan": 1350, "wait_s": 3.0},
+        {"tilt": 1300, "pan": 1350, "wait_s": 3.0},
+        {"tilt": 2000, "pan": 2350, "wait_s": 3.0},
+        {"tilt": 1800, "pan": 2350, "wait_s": 3.0},
+        {"tilt": 1500, "pan": 2350, "wait_s": 3.0},
+        {"tilt": 1300, "pan": 2350, "wait_s": 3.0},
+        {"tilt": 2000, "pan": 2350, "wait_s": 2.0}
+      ]
+    # Set to true to continuously loop through the sequences until success/timeout/cancel
+    camera_sequence_repeat: false

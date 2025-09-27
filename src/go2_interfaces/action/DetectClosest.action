@@ -1,0 +1,26 @@
+# Goal
+string class_name
+float32 timeout_s
+int32 confirm_frames
+bool require_depth
+---
+# Result
+bool success
+string reason
+int32 saved_id
+int32 bbox_x1
+int32 bbox_y1
+int32 bbox_x2
+int32 bbox_y2
+float32 world_x
+float32 world_y
+float32 world_z
+string image_file
+float64 timestamp
+---
+# Feedback
+string active_class
+float32 closest_px_dist
+int32 candidates
+bool camera_moving
+bool depth_ready

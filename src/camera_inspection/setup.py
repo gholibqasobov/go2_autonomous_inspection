@@ -10,9 +10,16 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/config', ['config/detect_closest_params.yaml']),
         ('share/' + package_name + '/damaged_objects', ['damaged_objects/damaged_objects_data.json']),
     ],
-    install_requires=['setuptools'],
+    install_requires=[
+        'setuptools',
+        'ultralytics',          # YOLO model loader
+        'deep-sort-realtime',   # Object tracker
+        'opencv-python',        # cv2
+        'numpy',
+    ],
     zip_safe=True,
     maintainer='qasob',
     maintainer_email='qasobovgholib@gmail.com',
