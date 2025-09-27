@@ -52,6 +52,9 @@ class RotateRobotActionServer(Node):
         """Get current robot orientation from TF messages"""
         for transform in msg.transforms:
             self.current_theta = transform.transform.rotation.z
+            theta_sign = transform.transform.rotation.w
+            sign = 1 if theta_sign*self.current_theta >= 0 else -1
+            self.current_theta = sign * abs(self.current_theta)
 
     def goal_callback(self, goal_request):
         """Called when a goal is received"""
@@ -97,14 +100,14 @@ class RotateRobotActionServer(Node):
         self.goal_theta = goal_handle.request.theta
         
         
-        time.sleep(0.1)
+        
         
         
         rotation_dir = self.rotation_direction(self.current_theta, self.goal_theta)
         self.get_logger().info(f"Rotation direction: {rotation_dir}, Current: {self.current_theta:.3f}, Goal: {self.goal_theta:.3f}")
 
         
-        self.send_joy(rotation_dir, 0.5)
+        self.send_joy(rotation_dir, 0.3)
         self.rotation_started = True
 
         feedback = RotateRobotAngle.Feedback()
@@ -122,7 +125,7 @@ class RotateRobotActionServer(Node):
                 return result
 
             # Check if we've reached the goal (using same tolerance as your working code)
-            if np.isclose(self.current_theta, self.goal_theta, atol=0.03):
+            if np.isclose(self.current_theta, self.goal_theta, atol=0.003):
                 # Stop the robot
                 self.send_joy(0, 0.0)
                 self.get_logger().info("Robot reached goal orientation")
@@ -135,7 +138,7 @@ class RotateRobotActionServer(Node):
             goal_handle.publish_feedback(feedback)
             self.get_logger().info(f"Feedback: current_theta={feedback.current_theta}, goal={self.goal_theta:.3f}")
 
-            time.sleep(0.1)
+            time.sleep(0.05)
             iteration += 1
 
         # If we get here, we hit the safety limit
