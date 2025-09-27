@@ -18,7 +18,9 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/AprilTagDocking.action"
   "action/MoveToGoal.action"
   "action/WaypointFollower.action"
-DENCIES geometry_msgs
+  "action/RotateCameraServo.action"
+  "action/RotateRobotAngle.action"
+  DEPENDENCIES geometry_msgs
 )
 
 
