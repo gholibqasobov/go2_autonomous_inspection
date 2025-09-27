@@ -4,7 +4,7 @@ from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from geometry_msgs.msg import PointStamped
-from go2_interfaces.action import WaypointFollower, RotateRobotAngle
+from go2_interfaces.action import WaypointFollower, RotateRobotAngle, DetectClosest
 import yaml
 
 class CombinedActionClient(Node):
@@ -12,13 +12,14 @@ class CombinedActionClient(Node):
         super().__init__('combined_action_client')
         callback_group = ReentrantCallbackGroup()
 
-        # Action clients dictionary
+        # Action clients dictionary including DetectClosest
         self._action_clients = {
             'waypoint_follower': ActionClient(self, WaypointFollower, 'waypoint_follower', callback_group=callback_group),
-            'rotate_robot': ActionClient(self, RotateRobotAngle, 'rotate_robot', callback_group=callback_group)
+            'rotate_robot': ActionClient(self, RotateRobotAngle, 'rotate_robot', callback_group=callback_group),
+            'detect_closest': ActionClient(self, DetectClosest, '/damaged_object_tracker_server/detect_closest', callback_group=callback_group)
         }
 
-        self.get_logger().info('Combined Action Client initialized')
+        self.get_logger().info('Inspection Client initialized')
 
         # Sequence of steps (list of dicts)
         self._sequence = []
@@ -48,6 +49,13 @@ class CombinedActionClient(Node):
             theta = step.get('theta', 0.0)
             self.send_rotate_goal(theta, self._step_done_cb)
 
+        elif action_type == 'detect_closest':
+            class_name = step.get('class_name', '')
+            timeout = step.get('timeout', 20.0)
+            confirm_frames = step.get('confirm_frames', 3)
+            require_depth = step.get('require_depth', False)
+            self.send_detect_closest_goal(class_name, timeout, confirm_frames, require_depth, self._step_done_cb)
+
         else:
             self.get_logger().error(f'Unknown step type: {action_type}')
             rclpy.shutdown()
@@ -67,7 +75,6 @@ class CombinedActionClient(Node):
         client = self._action_clients['waypoint_follower']
         client.wait_for_server()
 
-        # Construct PointStamped
         waypoint = PointStamped()
         waypoint.header.stamp = self.get_clock().now().to_msg()
         waypoint.header.frame_id = 'map'
@@ -134,6 +141,45 @@ class CombinedActionClient(Node):
             self.get_logger().info('Rotation failed or was canceled.')
         done_cb(success)
 
+    # -- DetectClosest Action --
+    def send_detect_closest_goal(self, class_name, timeout_s, confirm_frames, require_depth, done_cb):
+        self.get_logger().info(f'Waiting for DetectClosest server to detect class "{class_name}"...')
+        client = self._action_clients['detect_closest']
+        client.wait_for_server()
+
+        goal_msg = DetectClosest.Goal()
+        goal_msg.class_name = str(class_name)
+        goal_msg.timeout_s = float(timeout_s)
+        goal_msg.confirm_frames = int(confirm_frames)
+        goal_msg.require_depth = bool(require_depth)
+
+        fut = client.send_goal_async(goal_msg, feedback_callback=self._detect_closest_feedback)
+        fut.add_done_callback(lambda f: self._on_detect_closest_response(f, done_cb))
+
+    def _on_detect_closest_response(self, future, done_cb):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().info('DetectClosest goal rejected')
+            done_cb(False)
+            return
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(lambda f: self._detect_closest_result_callback(f, done_cb))
+
+    def _detect_closest_feedback(self, feedback_msg):
+        fb = feedback_msg.feedback
+        closest = f"{fb.closest_px_dist:.1f}px" if fb.closest_px_dist >= 0 else "N/A"
+        self.get_logger().info(
+            f'DetectClosest feedback: class={fb.active_class} closest={closest} '
+            f'candidates={fb.candidates} camera_moving={fb.camera_moving} depth_ready={fb.depth_ready}'
+        )
+
+    def _detect_closest_result_callback(self, future, done_cb):
+        result = future.result().result
+        success = getattr(result, 'success', False)
+        reason = getattr(result, 'reason', '')
+        self.get_logger().info(f'DetectClosest result success={success} reason="{reason}"')
+        done_cb(success)
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -141,22 +187,13 @@ def main(args=None):
     executor = MultiThreadedExecutor()
     executor.add_node(node)
 
-    
-
     with open("/home/qasob/go2_autonomous_inspection/src/go2_waypoint_nav/navigation_path/test_waypoint.yaml") as stream:
         try:
             data = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
             print(exc)
-    
-    # orientation = data['waypoints'][0]['pose']['orientation']
-    # position = data['waypoints'][0]['pose']['position']
+            return
 
-    # theta = orientation['w']
-    # x, y, z = position['x'], position['y'], position['z'] 
-    # id = data['waypoints'][0]['pose']['object']['object_id']
-
-    # sequence = [{'type': 'rotate_robot', 'theta': 0.0}]
     waypoints = []
     orientations = []
 
@@ -164,27 +201,19 @@ def main(args=None):
         orientation = data['waypoints'][i]['pose']['orientation']
         position = data['waypoints'][i]['pose']['position']
 
-        theta = orientation['z']
-        x, y, z = position['x'], position['y'], position['z'] 
+        theta = orientation['z']  # or orientation['w'] if that is the correct yaw
+        x, y, z = position['x'], position['y'], position['z']
 
-        
         waypoints.append({'type': 'waypoint_follower', 'x': x, 'y': y, 'z': z})
         orientations.append({'type': 'rotate_robot', 'theta': theta})
-        
+
     combined_sequence = []
     for wp, ori in zip(waypoints, orientations):
         combined_sequence.append(wp)
         combined_sequence.append(ori)
 
-    # Example sequence combining both actions
-    # sequence = [
-    #     {'type': 'waypoint_follower', 'x': 2.0, 'y': -2.0, 'z': 0.0},
-    #     {'type': 'rotate_robot', 'theta': 0.5},
-    #     {'type': 'waypoint_follower', 'x': 6.0, 'y': -7.0, 'z': 0.0},
-    #     {'type': 'rotate_robot', 'theta': -0.5},
-    #     {'type': 'waypoint_follower', 'x': 7.0, 'y': -8.0, 'z': 0.0},
-    #     {'type': 'rotate_robot', 'theta': 1.0}
-    # ]
+    # Example adding DetectClosest step somewhere in sequence:
+    combined_sequence.append({'type': 'detect_closest', 'class_name': 'crack', 'timeout': 20.0, 'confirm_frames': 3, 'require_depth': False})
 
     node.run_sequence(combined_sequence)
 
@@ -199,24 +228,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
-
-
-
-"""
-
-try:
-    with open('config.yaml', 'r') as f:
-        # Use yaml.safe_load for security when dealing with untrusted sources
-        data = yaml.safe_load(f) 
-    
-    print(data)
-    print(f"Database host: {data['database']['host']}")
-    print(f"Server port: {data['server']['port']}")
-
-except FileNotFoundError:
-    print("Error: 'config.yaml' not found.")
-except yaml.YAMLError as e:
-    print(f"Error parsing YAML file: {e}")
-
-"""
