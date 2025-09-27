@@ -3,10 +3,8 @@ from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.executors import MultiThreadedExecutor
-
 from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import Joy
-import yaml
 import time
 
 from go2_interfaces.action import WaypointFollower  # Your custom action
@@ -32,13 +30,11 @@ class WaypointFollowerServer(Node):
         self.goal_pub = self.create_publisher(PointStamped, 'way_point', 10)
         self.joy_pub = self.create_publisher(Joy, 'joy', 10)
 
-        self.goals = []
-        self.goal_index = 0
         self._goal_handle = None
         self._goal_canceled = False
-
+            
     def goal_callback(self, goal_request):
-        self.get_logger().info(f"Received goal request: {goal_request.waypoint_file}")
+        self.get_logger().info(f"Received goal request: {goal_request.waypoint}")
         return GoalResponse.ACCEPT
 
     def cancel_callback(self, goal_handle):
@@ -50,52 +46,31 @@ class WaypointFollowerServer(Node):
         self._goal_handle = goal_handle
         self._goal_canceled = False
 
-        filename = goal_handle.request.waypoint_file
         result = WaypointFollower.Result()
 
-        # Relative Path: src/go2_waypoint_nav/navigation_path/test_waypoint.yaml
-
-        try:
-            with open(f'/home/qasob/go2_autonomous_inspection/src/go2_waypoint_nav/navigation_path/{filename}', 'r') as file:
-                data = yaml.safe_load(file)
-                self.goals = data.get('waypoints', [])
-        except Exception as e:
-            self.get_logger().error(f"Failed to load {filename}: {e}")
-            result.success = False
-            goal_handle.abort()
-            return result
-
-        self.goal_index = 0
         self.send_auto_mode_joy()
-        # await rclpy.task.sleep(2.0)  # Wait for auto mode to engage
         time.sleep(2.0)
 
-        for goal_data in self.goals:
-            if goal_handle.is_cancel_requested:
-                self.get_logger().info("Goal canceled")
-                goal_handle.canceled()
-                result.success = False
-                return result
+        if goal_handle.is_cancel_requested:
+            self.get_logger().info("Goal canceled")
+            goal_handle.canceled()
+            result.success = False
+            return result
 
-            msg = PointStamped()
-            msg.header.stamp = self.get_clock().now().to_msg()
-            msg.header.frame_id = goal_data['header']['frame_id']
-            msg.point.x = goal_data['pose']['position']['x']
-            msg.point.y = goal_data['pose']['position']['y']
-            msg.point.z = goal_data['pose']['position']['z']
+        waypoint = PointStamped()
+        waypoint = goal_handle.request.waypoint
 
-            self.goal_pub.publish(msg)
-            self.get_logger().info(f"Published goal {self.goal_index + 1}/{len(self.goals)}: {msg}")
+        self.goal_pub.publish(waypoint)
+        self.get_logger().info(f"Published goal {waypoint}")
 
-            feedback = WaypointFollower.Feedback()
-            feedback.current_position = f"Sent goal {self.goal_index + 1}"
-            goal_handle.publish_feedback(feedback)
+        feedback = WaypointFollower.Feedback()
+        feedback.current_position = f"Moving to goal: {waypoint}"
+        goal_handle.publish_feedback(feedback)
 
-            self.goal_index += 1
-            # await rclpy.task.sleep(7.0)
-            time.sleep(7.0)
+        
+        time.sleep(15.0) # wait till robot reaches waypoint
 
-        self.get_logger().info("All goals sent successfully")
+        self.get_logger().info("Waypoint execution complete")
         result.success = True
         goal_handle.succeed()
         return result
