@@ -12,6 +12,21 @@
 
 damaged_object_tracker_server:
   ros__parameters:
+    # --- Detection/motion gating tuning ---
+    # Set true to allow detections even while camera is moving
+    disable_motion_gating: false
+    # YOLO confidence threshold
+    conf_thresh: 0.5
+    # Frame-diff motion detection: number of pixels above diff threshold to consider motion
+    frame_stationary_thresh: 3000
+    # Per-pixel difference threshold (0..255)
+    frame_diff_thresh: 20
+    # Servo motion detection thresholds
+    servo_motion_thresh_rad: 0.02
+    servo_stable_frames: 5
+    # Minimum distance (meters) to consider a detection duplicate of an existing saved object
+    proximity_thresh_m: 0.3
+
     # Group A: comma-separated class names
     group_a_classes: "light_on,light_off,half_working_light"
     # Target servo angles for Group A (servo units)

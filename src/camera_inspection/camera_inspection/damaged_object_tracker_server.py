@@ -61,15 +61,25 @@ class DamagedObjectTrackerServer(Node):
         self.cv_bridge = CvBridge()
         self.model = YOLO('src/camera_inspection/model/damaged_object_yolo.pt')
         
-        # Object tracking parameters
-        self.CONF_THRESH = 0.5
-        self.STATIONARY_THRESH = 3000  # Reduced for more sensitive motion detection
-        self.DIFF_THRESH = 20          # Reduced for more sensitive motion detection
-        self.PROXIMITY_THRESH = 0.3
-        
+        # Object tracking parameters (configurable via ROS params)
+        # Defaults chosen for moderate sensitivity; can be overridden at runtime
+        self.declare_parameter('conf_thresh', 0.5)
+        self.declare_parameter('frame_stationary_thresh', 3000)  # moving pixels threshold
+        self.declare_parameter('frame_diff_thresh', 20)          # pixel intensity diff threshold
+        self.declare_parameter('proximity_thresh_m', 0.3)
+        self.declare_parameter('servo_motion_thresh_rad', 0.02)  # ~1.1 degrees
+        self.declare_parameter('servo_stable_frames', 5)
+        self.declare_parameter('disable_motion_gating', False)
+
+        self.CONF_THRESH = float(self.get_parameter('conf_thresh').value)
+        self.STATIONARY_THRESH = int(self.get_parameter('frame_stationary_thresh').value)
+        self.DIFF_THRESH = int(self.get_parameter('frame_diff_thresh').value)
+        self.PROXIMITY_THRESH = float(self.get_parameter('proximity_thresh_m').value)
+
         # Camera motion detection parameters
-        self.SERVO_MOTION_THRESH = 0.02  # ~1.1 degrees in radians
-        self.SERVO_STABLE_FRAMES = 5     # Frames to wait after servo stops moving
+        self.SERVO_MOTION_THRESH = float(self.get_parameter('servo_motion_thresh_rad').value)
+        self.SERVO_STABLE_FRAMES = int(self.get_parameter('servo_stable_frames').value)
+        self.disable_motion_gating = bool(self.get_parameter('disable_motion_gating').value)
         
         # Initialize tracker with parameters optimized for moving camera
         self.tracker = DeepSort(
@@ -951,7 +961,7 @@ class DamagedObjectTrackerServer(Node):
             
             self.last_gray = gray
             
-            if self.camera_is_moving:
+            if self.camera_is_moving and not self.disable_motion_gating:
                 motion_reason = []
                 if frame_motion_detected:
                     motion_reason.append(f"frame_motion({moving_pixels}px)")

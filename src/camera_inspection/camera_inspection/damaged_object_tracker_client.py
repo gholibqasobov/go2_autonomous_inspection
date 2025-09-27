@@ -3,6 +3,9 @@
 import argparse
 import sys
 from typing import Optional
+import os
+import json
+import time
 
 import rclpy
 from rclpy.action import ActionClient
@@ -69,6 +72,53 @@ class DetectClosestClient(Node):
         rclpy.spin_until_future_complete(self, cancel_future)
         return True
 
+    # ----- logging helpers -----
+    @staticmethod
+    def _ensure_parent_dir(path: str):
+        try:
+            parent = os.path.dirname(path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+        except Exception:
+            pass
+
+    def log_run(self, log_file: str, *,
+                class_name: str,
+                success: bool,
+                reason: str,
+                result: Optional[DetectClosest.Result],
+                params: dict):
+        """Append one JSON line describing this run to log_file.
+
+        Uses Option B location by default (under src/) but allows override via CLI.
+        """
+        record = {
+            'client_ts': float(time.time()),
+            'action_name': '/damaged_object_tracker_server/detect_closest',
+            'class_name': class_name,
+            'success': bool(success),
+            'reason': str(reason) if reason is not None else '',
+            'params': params or {},
+        }
+        if result is not None:
+            try:
+                record.update({
+                    'saved_id': int(result.saved_id),
+                    'bbox': [int(result.bbox_x1), int(result.bbox_y1), int(result.bbox_x2), int(result.bbox_y2)],
+                    'world': [float(result.world_x), float(result.world_y), float(result.world_z)],
+                    'image_file': str(result.image_file),
+                    'server_ts': float(result.timestamp),
+                })
+            except Exception:
+                # Best-effort if fields are missing or types differ
+                pass
+        self._ensure_parent_dir(log_file)
+        try:
+            with open(log_file, 'a') as f:
+                f.write(json.dumps(record) + "\n")
+        except Exception as e:
+            self.get_logger().warn(f"Failed to write log to '{log_file}': {e}")
+
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(description='DetectClosest action client')
@@ -77,6 +127,9 @@ def parse_args(argv):
     parser.add_argument('--confirm', type=int, default=3, help='Confirm frames')
     parser.add_argument('--require-depth', action='store_true', help='Require depth measurement')
     parser.add_argument('--cancel-after', type=float, default=None, help='Cancel after N seconds (for testing)')
+    parser.add_argument('--log-file', type=str,
+                        default=os.path.join('src', 'camera_inspection', 'damaged_objects', 'detect_closest_runs.jsonl'),
+                        help='Path to append JSONL logs (default under src/)')
     return parser.parse_args(argv)
 
 
@@ -89,6 +142,19 @@ def main(argv=None):
         node.get_logger().info('Waiting for DetectClosest action server...')
         if not node.wait_for_server(timeout_sec=10.0):
             node.get_logger().error('Server not available')
+            # Log rejected-equivalent outcome (no server)
+            node.log_run(
+                args.log_file,
+                class_name=args.class_name,
+                success=False,
+                reason='server_unavailable',
+                result=None,
+                params={
+                    'timeout_s': float(args.timeout),
+                    'confirm_frames': int(args.confirm),
+                    'require_depth': bool(args.require_depth),
+                },
+            )
             return 1
 
         # Optional timed cancel
@@ -106,6 +172,19 @@ def main(argv=None):
             require_depth=args.require_depth,
         )
         if result_tuple is None:
+            # Goal was rejected
+            node.log_run(
+                args.log_file,
+                class_name=args.class_name,
+                success=False,
+                reason='rejected',
+                result=None,
+                params={
+                    'timeout_s': float(args.timeout),
+                    'confirm_frames': int(args.confirm),
+                    'require_depth': bool(args.require_depth),
+                },
+            )
             return 2
         status, result = result_tuple
         node.get_logger().info(
@@ -113,6 +192,19 @@ def main(argv=None):
             f"bbox=({result.bbox_x1},{result.bbox_y1},{result.bbox_x2},{result.bbox_y2}) "
             f"world=({result.world_x:.2f},{result.world_y:.2f},{result.world_z:.2f}) "
             f"image='{result.image_file}' ts={result.timestamp:.3f} status={status}"
+        )
+        # Log success/timeout/canceled outcomes
+        node.log_run(
+            args.log_file,
+            class_name=args.class_name,
+            success=bool(result.success),
+            reason=str(result.reason),
+            result=result,
+            params={
+                'timeout_s': float(args.timeout),
+                'confirm_frames': int(args.confirm),
+                'require_depth': bool(args.require_depth),
+            },
         )
         if timer:
             node.destroy_timer(timer)
