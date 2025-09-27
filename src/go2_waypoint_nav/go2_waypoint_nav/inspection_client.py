@@ -208,12 +208,23 @@ def main(args=None):
         orientations.append({'type': 'rotate_robot', 'theta': theta})
 
     combined_sequence = []
-    for wp, ori in zip(waypoints, orientations):
-        combined_sequence.append(wp)
-        combined_sequence.append(ori)
+    # for wp, ori in zip(waypoints, orientations):
+    #     combined_sequence.append(wp)
+    #     combined_sequence.append(ori)
+    sequence = [
+        {'type': 'waypoint_follower', 'x': 2.0, 'y': -2.0, 'z': 0.0},
+        {'type': 'rotate_robot', 'theta': 0.5},
+        {'type': 'detect_closest', 'class_name': 'light_off', 'timeout': 20.0, 'confirm_frames': 3, 'require_depth': False},
+        {'type': 'waypoint_follower', 'x': 6.0, 'y': -7.0, 'z': 0.0},
+        {'type': 'rotate_robot', 'theta': -0.5},
+        {'type': 'detect_closest', 'class_name': 'fire_extinguisher', 'timeout': 20.0, 'confirm_frames': 3, 'require_depth': False},
+        {'type': 'waypoint_follower', 'x': 7.0, 'y': -8.0, 'z': 0.0},
+        {'type': 'rotate_robot', 'theta': 1.0}
+    ]
+
 
     # Example adding DetectClosest step somewhere in sequence:
-    combined_sequence.append({'type': 'detect_closest', 'class_name': 'crack', 'timeout': 20.0, 'confirm_frames': 3, 'require_depth': False})
+    # combined_sequence.append({'type': 'detect_closest', 'class_name': 'crack', 'timeout': 20.0, 'confirm_frames': 3, 'require_depth': False})
 
     node.run_sequence(combined_sequence)
 
