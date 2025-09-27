@@ -77,9 +77,49 @@ class RotateRobotActionServer(Node):
         self.joy_pub.publish(joy_msg)
         self.get_logger().info(f"Published Joy command: axes[3]={orientation * speed}")
 
-    def rotation_direction(self, current_theta, goal_theta):
-        diff = (goal_theta - current_theta + 0.5) % 1.0 - 0.5
-        return 1 if diff > 0 else -1
+    # def rotation_direction(self, current_theta, goal_theta):
+    #     diff = (goal_theta - current_theta + 0.5) % 1.0 - 0.5
+    #     return 1 if diff > 0 else -1
+    def rotation_direction(self, current, goal, circle_length=1.0):
+        """
+        Calculate shortest rotation direction from current to goal orientation.
+
+        Parameters:
+        - current (float): current orientation (can be negative or positive)
+        - goal (float): goal orientation (can be negative or positive)
+        - circle_length (float): total length of circular scale (default 10)
+
+        Returns:
+        - direction (str): "CCW" if counterclockwise is shortest,
+                        "CW" if clockwise is shortest,
+                        "None" if orientations are equal.
+        - delta (float): signed shortest angular difference (positive means CCW, negative means CW)
+        """
+
+        # Normalize both angles to [0, circle_length)
+        def norm_angle(x):
+            return x if x >= 0 else x + circle_length
+
+        current_norm = norm_angle(current)
+        goal_norm = norm_angle(goal)
+
+        # Calculate difference
+        delta = goal_norm - current_norm
+
+        # Adjust delta to be within [-circle_length/2, circle_length/2]
+        half_circle = circle_length / 2
+        if delta > half_circle:
+            delta -= circle_length
+        elif delta < -half_circle:
+            delta += circle_length
+
+        # Determine direction
+        if delta > 0:
+            direction = 1
+        elif delta < 0:
+            direction = -1
+
+        return direction
 
     async def execute_callback(self, goal_handle):
         """Executes the rotation goal asynchronously"""
@@ -107,7 +147,7 @@ class RotateRobotActionServer(Node):
         self.get_logger().info(f"Rotation direction: {rotation_dir}, Current: {self.current_theta:.3f}, Goal: {self.goal_theta:.3f}")
 
         
-        self.send_joy(rotation_dir, 0.3)
+        self.send_joy(rotation_dir, 0.25)
         self.rotation_started = True
 
         feedback = RotateRobotAngle.Feedback()
@@ -125,7 +165,7 @@ class RotateRobotActionServer(Node):
                 return result
 
             # Check if we've reached the goal (using same tolerance as your working code)
-            if np.isclose(self.current_theta, self.goal_theta, atol=0.003):
+            if np.isclose(self.current_theta, self.goal_theta, atol=0.006):
                 # Stop the robot
                 self.send_joy(0, 0.0)
                 self.get_logger().info("Robot reached goal orientation")
@@ -138,7 +178,7 @@ class RotateRobotActionServer(Node):
             goal_handle.publish_feedback(feedback)
             self.get_logger().info(f"Feedback: current_theta={feedback.current_theta}, goal={self.goal_theta:.3f}")
 
-            time.sleep(0.05)
+            time.sleep(0.1)
             iteration += 1
 
         # If we get here, we hit the safety limit

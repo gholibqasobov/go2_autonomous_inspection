@@ -35,3 +35,6 @@ for wp, ori in zip(waypoints, orientations):
     combined_sequence.append(ori)
 
 print("Waypoints:", combined_sequence)
+
+
+print(1.1 % 1.0)
