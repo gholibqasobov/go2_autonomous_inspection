@@ -42,13 +42,17 @@ def get_waypoints_by_ids(waypoints_data, id_list):
     return filtered_waypoints, filtered_orientations
 
 # Get waypoints for the specified IDs
-sequence = [{'type': 'rotate_robot', 'theta': 0.0}]
 waypoints, orientations = get_waypoints_by_ids(data, given_ids)
         
 combined_sequence = []
-for wp, ori in zip(waypoints, orientations):
-    combined_sequence.append(wp)
-    combined_sequence.append(ori)
 
+def combine_sequence(waypoints, orientations):
+    combined_sequence = []
+    for wp, ori in zip(waypoints, orientations):
+        combined_sequence.append(wp)
+        combined_sequence.append(ori)
+    return combined_sequence
+
+combined_sequence = combine_sequence(waypoints, orientations)
 print(f"\nFiltered waypoints for IDs {given_ids}:")
 print("Combined sequence:", combined_sequence)

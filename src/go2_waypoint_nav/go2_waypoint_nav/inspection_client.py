@@ -6,6 +6,7 @@ from rclpy.executors import MultiThreadedExecutor
 from geometry_msgs.msg import PointStamped
 from go2_interfaces.action import WaypointFollower, RotateRobotAngle, DetectClosest
 import yaml
+from go2_waypoint_nav.open_inspection_ids import get_waypoints_by_ids, combine_sequence
 
 class CombinedActionClient(Node):
     def __init__(self):
@@ -187,6 +188,7 @@ def main(args=None):
     executor = MultiThreadedExecutor()
     executor.add_node(node)
 
+
     with open("/home/qasob/go2_autonomous_inspection/src/go2_waypoint_nav/navigation_path/test_waypoint.yaml") as stream:
         try:
             data = yaml.safe_load(stream)
@@ -197,30 +199,43 @@ def main(args=None):
     waypoints = []
     orientations = []
 
-    for i in range(len(data['waypoints'])):
-        orientation = data['waypoints'][i]['pose']['orientation']
-        position = data['waypoints'][i]['pose']['position']
+    """Get position and orientation for a given list of IDs"""
+    given_ids = [1, 2, 3]  # List of IDs to filter for
 
-        theta = orientation['z']  # or orientation['w'] if that is the correct yaw
-        x, y, z = position['x'], position['y'], position['z']
+    waypoints, orientations = get_waypoints_by_ids(data, given_ids)
 
-        waypoints.append({'type': 'waypoint_follower', 'x': x, 'y': y, 'z': z})
-        orientations.append({'type': 'rotate_robot', 'theta': theta})
+    combined_sequence = combine_sequence(waypoints, orientations)
 
-    combined_sequence = []
+
+
+
+
+    """============================================================"""
+
+    # for i in range(len(data['waypoints'])):
+    #     orientation = data['waypoints'][i]['pose']['orientation']
+    #     position = data['waypoints'][i]['pose']['position']
+
+    #     theta = orientation['z']  # or orientation['w'] if that is the correct yaw
+    #     x, y, z = position['x'], position['y'], position['z']
+
+    #     waypoints.append({'type': 'waypoint_follower', 'x': x, 'y': y, 'z': z})
+    #     orientations.append({'type': 'rotate_robot', 'theta': theta})
+
+
     # for wp, ori in zip(waypoints, orientations):
     #     combined_sequence.append(wp)
     #     combined_sequence.append(ori)
-    sequence = [
-        {'type': 'waypoint_follower', 'x': 2.0, 'y': -2.0, 'z': 0.0},
-        {'type': 'rotate_robot', 'theta': 0.5},
-        {'type': 'detect_closest', 'class_name': 'light_off', 'timeout': 20.0, 'confirm_frames': 3, 'require_depth': False},
-        {'type': 'waypoint_follower', 'x': 6.0, 'y': -7.0, 'z': 0.0},
-        {'type': 'rotate_robot', 'theta': -0.5},
-        {'type': 'detect_closest', 'class_name': 'fire_extinguisher', 'timeout': 20.0, 'confirm_frames': 3, 'require_depth': False},
-        {'type': 'waypoint_follower', 'x': 7.0, 'y': -8.0, 'z': 0.0},
-        {'type': 'rotate_robot', 'theta': 1.0}
-    ]
+    # sequence = [
+    #     {'type': 'waypoint_follower', 'x': 2.0, 'y': -2.0, 'z': 0.0},
+    #     {'type': 'rotate_robot', 'theta': 0.5},
+    #     {'type': 'detect_closest', 'class_name': 'light_off', 'timeout': 20.0, 'confirm_frames': 3, 'require_depth': False},
+    #     {'type': 'waypoint_follower', 'x': 6.0, 'y': -7.0, 'z': 0.0},
+    #     {'type': 'rotate_robot', 'theta': -0.5},
+    #     {'type': 'detect_closest', 'class_name': 'fire_extinguisher', 'timeout': 20.0, 'confirm_frames': 3, 'require_depth': False},
+    #     {'type': 'waypoint_follower', 'x': 7.0, 'y': -8.0, 'z': 0.0},
+    #     {'type': 'rotate_robot', 'theta': 1.0}
+    # ]
 
 
     # Example adding DetectClosest step somewhere in sequence:
