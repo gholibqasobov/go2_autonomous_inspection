@@ -20,6 +20,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/WaypointFollower.action"
   "action/RotateCameraServo.action"
   "action/RotateRobotAngle.action"
+  "action/DetectClosest.action"
   DEPENDENCIES geometry_msgs
 )
 
