@@ -35,10 +35,13 @@ ament_target_dependencies(go2_move_joy_server rclcpp std_msgs geometry_msgs unit
 add_executable(go2_move_server src/go2_move_server.cpp)
 ament_target_dependencies(go2_move_server rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs rclcpp_action go2_interfaces)
 
+add_executable(go2_move_vel src/go2_move_vel.cpp)
+ament_target_dependencies(go2_move_vel rclcpp std_msgs geometry_msgs unitree_api go2_sport_api sensor_msgs tf2_msgs nav_msgs)
 
 install(TARGETS
   go2_move_server
   go2_move_joy_server
+  go2_move_vel
   DESTINATION lib/${PROJECT_NAME}
 )
 

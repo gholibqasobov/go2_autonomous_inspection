@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
             'astar_planner = go2_nav.astar_planner:main',
             'path_follower = go2_nav.path_follower:main',
+            'test_go2_move_vel = go2_nav.test_go2_move_vel:main',
         ],
     },
 )
