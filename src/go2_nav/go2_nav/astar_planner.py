@@ -44,8 +44,8 @@ class AStarPlanner(Node):
         self.inflated_map = None
         
         # Safety parameters
-        self.robot_radius = 0.3  # Robot radius in meters (adjust as needed)
-        self.safety_margin = 0.2  # Additional safety margin in meters
+        self.robot_radius = 0.6  # Robot radius in meters (adjust as needed)
+        self.safety_margin = 0.4  # Additional safety margin in meters
 
         # Timer to check map reception
         self.map_check_timer = self.create_timer(2.0, self.check_map_status)
