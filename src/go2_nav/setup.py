@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'astar_planner = go2_nav.astar_planner:main',
+            'path_follower = go2_nav.path_follower:main',
         ],
     },
 )
