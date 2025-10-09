@@ -15,6 +15,9 @@ gnome-terminal -- bash -c "ros2 launch test_map_ws/src/map_provider/launch/map_p
 gnome-terminal -- bash -c "ros2 run go2_move go2_vel_by_joy; exec bash"
 sleep 1
 
+gnome-terminal -- bash -c "ros2 run go2_waypoint_nav go2_waypoint_follower_server; exec bash"
+sleep 1
+
 # A* Path Planner
 gnome-terminal -- bash -c "ros2 run go2_nav astar_planner; exec bash"
 sleep 3

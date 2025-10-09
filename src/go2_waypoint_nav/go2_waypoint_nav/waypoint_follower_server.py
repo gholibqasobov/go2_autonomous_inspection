@@ -3,7 +3,7 @@ from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.executors import MultiThreadedExecutor
-from geometry_msgs.msg import PointStamped
+from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import Joy
 import time
 
@@ -48,7 +48,9 @@ class WaypointFollowerServer(Node):
         # Timer to check every 1.5 seconds
         self.timer = self.create_timer(2.5, self.check_reached_goal)
 
-        self.goal_pub = self.create_publisher(PointStamped, 'way_point', 10)
+        # Goal pose publisher to A*
+        self.goal_pub = self.create_publisher(PoseStamped, 'object_pose', 10)
+
         self.joy_pub = self.create_publisher(Joy, 'joy', 10)
 
     def tf_callback(self, msg: TFMessage):
@@ -109,8 +111,8 @@ class WaypointFollowerServer(Node):
 
         try:
             # Send auto mode
-            self.send_auto_mode_joy()
-            time.sleep(2.0)
+            # self.send_auto_mode_joy()
+            time.sleep(1.0)
 
             # Check if canceled before proceeding
             if goal_handle.is_cancel_requested:
@@ -127,6 +129,9 @@ class WaypointFollowerServer(Node):
             feedback = WaypointFollower.Feedback()
             feedback.current_position = f"Moving to goal: {waypoint}"
             goal_handle.publish_feedback(feedback)
+
+            # Publish to A* as well
+
 
             # Wait for goal completion or cancellation
             while rclpy.ok() and self.goal_active:

@@ -31,7 +31,7 @@ class AStarPlanner(Node):
         self.map_sub = self.create_subscription(
             OccupancyGrid, '/map', self.map_callback, map_qos)
         self.goal_sub = self.create_subscription(
-            PoseStamped, '/goal_pose', self.goal_callback, 10)
+            PoseStamped, '/object_pose', self.goal_callback, 10) # /goal_pose
 
         # Publisher
         self.path_pub = self.create_publisher(Path, '/planned_path', 10)
