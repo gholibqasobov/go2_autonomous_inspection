@@ -3,10 +3,10 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
-from geometry_msgs.msg import PointStamped
+from geometry_msgs.msg import PoseStamped
 from go2_interfaces.action import WaypointFollower, RotateRobotAngle, DetectClosest
 import yaml
-from go2_waypoint_nav.open_inspection_ids import get_waypoints_by_ids, combine_sequence
+from go2_waypoint_nav.generate_inspection_points import generate_object_inspection_points, filtered_waypoints_by_ids, get_waypoint_by_id
 
 class CombinedActionClient(Node):
     def __init__(self):
@@ -71,20 +71,27 @@ class CombinedActionClient(Node):
         self._run_next_step()
 
     # -- WaypointFollower Action --
-    def send_waypoint_goal(self, x, y, z, done_cb):
+    def send_waypoint_goal(self, x, y, z, done_cb, qx=0.0, qy=0.0, qz=0.0, qw=1.0):
         self.get_logger().info('Waiting for WaypointFollower server...')
         client = self._action_clients['waypoint_follower']
         client.wait_for_server()
 
-        waypoint = PointStamped()
+       # Create a PoseStamped message for the waypoint
+        waypoint = PoseStamped()
         waypoint.header.stamp = self.get_clock().now().to_msg()
-        waypoint.header.frame_id = 'map'
-        waypoint.point.x = x
-        waypoint.point.y = y
-        waypoint.point.z = z
+        waypoint.header.frame_id = 'map'  # Adjust frame_id as needed
+        waypoint.pose.position.x = x
+        waypoint.pose.position.y = y
+        waypoint.pose.position.z = z
+        waypoint.pose.orientation.x = qx
+        waypoint.pose.orientation.y = qy
+        waypoint.pose.orientation.z = qz
+        waypoint.pose.orientation.w = qw
 
+        # Create goal message
         goal_msg = WaypointFollower.Goal()
         goal_msg.waypoint = waypoint
+
 
         fut = client.send_goal_async(goal_msg, feedback_callback=self._waypoint_feedback)
         fut.add_done_callback(lambda f: self._on_waypoint_response(f, done_cb))
@@ -196,52 +203,17 @@ def main(args=None):
             print(exc)
             return
 
-    waypoints = []
-    orientations = []
+    """ ==============================================================================================="""
+    # given_ids = [4, 3, 1]
+    given_ids = list(map(int, input("Enter IDs separated by spaces: ").split()))
 
-    """Get position and orientation for a given list of IDs"""
-    given_ids = [1, 2, 3]  # List of IDs to filter for
+    filtered_waypoints = filtered_waypoints_by_ids(data, given_ids)
 
-    waypoints, orientations = get_waypoints_by_ids(data, given_ids)
-
-    combined_sequence = combine_sequence(waypoints, orientations)
-
-
-
-
+    inspection_sequence = generate_object_inspection_points(filtered_waypoints)
 
     """============================================================"""
 
-    # for i in range(len(data['waypoints'])):
-    #     orientation = data['waypoints'][i]['pose']['orientation']
-    #     position = data['waypoints'][i]['pose']['position']
-
-    #     theta = orientation['z']  # or orientation['w'] if that is the correct yaw
-    #     x, y, z = position['x'], position['y'], position['z']
-
-    #     waypoints.append({'type': 'waypoint_follower', 'x': x, 'y': y, 'z': z})
-    #     orientations.append({'type': 'rotate_robot', 'theta': theta})
-
-
-    # for wp, ori in zip(waypoints, orientations):
-    #     combined_sequence.append(wp)
-    #     combined_sequence.append(ori)
-    # sequence = [
-    #     {'type': 'waypoint_follower', 'x': 2.0, 'y': -2.0, 'z': 0.0},
-    #     {'type': 'rotate_robot', 'theta': 0.5},
-    #     {'type': 'detect_closest', 'class_name': 'light_off', 'timeout': 20.0, 'confirm_frames': 3, 'require_depth': False},
-    #     {'type': 'waypoint_follower', 'x': 6.0, 'y': -7.0, 'z': 0.0},
-    #     {'type': 'rotate_robot', 'theta': -0.5},
-    #     {'type': 'detect_closest', 'class_name': 'fire_extinguisher', 'timeout': 20.0, 'confirm_frames': 3, 'require_depth': False},
-    #     {'type': 'waypoint_follower', 'x': 7.0, 'y': -8.0, 'z': 0.0},
-    #     {'type': 'rotate_robot', 'theta': 1.0}
-    # ]
-
-
-    # Example adding DetectClosest step somewhere in sequence:
-    # combined_sequence.append({'type': 'detect_closest', 'class_name': 'crack', 'timeout': 20.0, 'confirm_frames': 3, 'require_depth': False})
-
-    node.run_sequence(combined_sequence)
+    node.run_sequence(inspection_sequence)
 
     try:
         executor.spin()

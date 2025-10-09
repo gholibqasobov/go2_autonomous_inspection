@@ -16,7 +16,7 @@ class PathFollower(Node):
         self.path_sub = self.create_subscription(Path, '/planned_path', self.path_callback, 10)
         
         # Publisher for requesting new path planning
-        self.goal_pub = self.create_publisher(PoseStamped, '/goal_pose', 10)
+        self.goal_pub = self.create_publisher(PoseStamped, '/object_pose', 10) # goal_pose
 
         # TF buffer and listener
         self.tf_buffer = tf2_ros.Buffer()

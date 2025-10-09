@@ -10,6 +10,9 @@ from geometry_msgs.msg import PoseStamped, Pose, Point
 import heapq
 import tf_transformations
 import tf2_ros
+import os
+import pickle
+import hashlib
 
 
 
@@ -28,7 +31,7 @@ class AStarPlanner(Node):
         self.map_sub = self.create_subscription(
             OccupancyGrid, '/map', self.map_callback, map_qos)
         self.goal_sub = self.create_subscription(
-            PoseStamped, '/goal_pose', self.goal_callback, 10)
+            PoseStamped, '/object_pose', self.goal_callback, 10) # /goal_pose
 
         # Publisher
         self.path_pub = self.create_publisher(Path, '/planned_path', 10)
@@ -46,6 +49,11 @@ class AStarPlanner(Node):
         # Safety parameters
         self.robot_radius = 0.6  # Robot radius in meters (adjust as needed)
         self.safety_margin = 0.4  # Additional safety margin in meters
+
+        # Cache directory for inflated maps (within workspace)
+        workspace_dir = os.path.expanduser("~/go2_autonomous_inspection")
+        self.cache_dir = os.path.join(workspace_dir, "map_cache")
+        os.makedirs(self.cache_dir, exist_ok=True)
 
         # Timer to check map reception
         self.map_check_timer = self.create_timer(2.0, self.check_map_status)
@@ -77,8 +85,18 @@ class AStarPlanner(Node):
         obstacle_cells = np.sum(self.map == 100)
         self.get_logger().info(f"Free cells: {free_cells}, Unknown: {unknown_cells}, Obstacles: {obstacle_cells}")
         
-        # Create inflated map for safer planning
-        self.create_inflated_map()
+        # Generate hash for this map configuration
+        map_hash = self.generate_map_hash()
+        
+        # Try to load from cache first
+        if self.load_inflated_map_from_cache(map_hash):
+            self.get_logger().info("Using cached inflated map - computation time saved!")
+        else:
+            # Create inflated map for safer planning
+            self.get_logger().info("Creating new inflated map...")
+            self.create_inflated_map()
+            # Save to cache for future use
+            self.save_inflated_map_to_cache(map_hash)
     
     def create_inflated_map(self):
         """Create an inflated obstacle map for safer path planning"""
@@ -126,6 +144,74 @@ class AStarPlanner(Node):
         inflated_obstacles = np.sum(self.inflated_map == 255)
         high_cost_cells = np.sum((self.inflated_map > 0) & (self.inflated_map < 255))
         self.get_logger().info(f"Inflation complete. Obstacles: {inflated_obstacles}, High-cost cells: {high_cost_cells}")
+
+    def generate_map_hash(self):
+        """Generate a unique hash for the current map and inflation parameters"""
+        if self.map is None or self.map_info is None:
+            return None
+        
+        # Create a string that uniquely identifies this map configuration
+        map_data = self.map.tobytes()
+        resolution = self.map_info.resolution
+        width = self.map_info.width
+        height = self.map_info.height
+        origin_x = self.map_info.origin.position.x
+        origin_y = self.map_info.origin.position.y
+        origin_z = self.map_info.origin.position.z
+        orientation_x = self.map_info.origin.orientation.x
+        orientation_y = self.map_info.origin.orientation.y
+        orientation_z = self.map_info.origin.orientation.z
+        orientation_w = self.map_info.origin.orientation.w
+        
+        # Include inflation parameters in hash
+        robot_radius = self.robot_radius
+        safety_margin = self.safety_margin
+        
+        # Create hash input string
+        hash_input = (f"{width}_{height}_{resolution}_{origin_x}_{origin_y}_{origin_z}_"
+                     f"{orientation_x}_{orientation_y}_{orientation_z}_{orientation_w}_"
+                     f"{robot_radius}_{safety_margin}_").encode('utf-8') + map_data
+        
+        # Generate MD5 hash
+        return hashlib.md5(hash_input).hexdigest()
+
+    def get_cache_filepath(self, map_hash):
+        """Get the full path for the cache file"""
+        return os.path.join(self.cache_dir, f"inflated_map_{map_hash}.pkl")
+
+    def save_inflated_map_to_cache(self, map_hash):
+        """Save the current inflated map to cache"""
+        if self.inflated_map is None or map_hash is None:
+            return False
+        
+        try:
+            cache_file = self.get_cache_filepath(map_hash)
+            with open(cache_file, 'wb') as f:
+                pickle.dump(self.inflated_map, f)
+            self.get_logger().info(f"Inflated map saved to cache: {cache_file}")
+            return True
+        except Exception as e:
+            self.get_logger().error(f"Failed to save inflated map to cache: {e}")
+            return False
+
+    def load_inflated_map_from_cache(self, map_hash):
+        """Load inflated map from cache if it exists"""
+        if map_hash is None:
+            return False
+        
+        try:
+            cache_file = self.get_cache_filepath(map_hash)
+            if os.path.exists(cache_file):
+                with open(cache_file, 'rb') as f:
+                    self.inflated_map = pickle.load(f)
+                self.get_logger().info(f"Inflated map loaded from cache: {cache_file}")
+                return True
+            else:
+                self.get_logger().info("No cached inflated map found")
+                return False
+        except Exception as e:
+            self.get_logger().error(f"Failed to load inflated map from cache: {e}")
+            return False
 
     def goal_callback(self, msg):
         if self.map is None:
