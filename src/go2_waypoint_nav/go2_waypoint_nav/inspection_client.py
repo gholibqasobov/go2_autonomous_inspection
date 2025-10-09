@@ -3,10 +3,9 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
-from geometry_msgs.msg import PointStamped
+from geometry_msgs.msg import PoseStamped
 from go2_interfaces.action import WaypointFollower, RotateRobotAngle, DetectClosest
 import yaml
-from go2_waypoint_nav.open_inspection_ids import get_waypoints_by_ids, combine_sequence
 from go2_waypoint_nav.generate_inspection_points import generate_object_inspection_points, filtered_waypoints_by_ids, get_waypoint_by_id
 
 class CombinedActionClient(Node):
@@ -72,20 +71,27 @@ class CombinedActionClient(Node):
         self._run_next_step()
 
     # -- WaypointFollower Action --
-    def send_waypoint_goal(self, x, y, z, done_cb):
+    def send_waypoint_goal(self, x, y, z, done_cb, qx=0.0, qy=0.0, qz=0.0, qw=1.0):
         self.get_logger().info('Waiting for WaypointFollower server...')
         client = self._action_clients['waypoint_follower']
         client.wait_for_server()
 
-        waypoint = PointStamped()
+       # Create a PoseStamped message for the waypoint
+        waypoint = PoseStamped()
         waypoint.header.stamp = self.get_clock().now().to_msg()
-        waypoint.header.frame_id = 'map'
-        waypoint.point.x = x
-        waypoint.point.y = y
-        waypoint.point.z = z
+        waypoint.header.frame_id = 'map'  # Adjust frame_id as needed
+        waypoint.pose.position.x = x
+        waypoint.pose.position.y = y
+        waypoint.pose.position.z = z
+        waypoint.pose.orientation.x = qx
+        waypoint.pose.orientation.y = qy
+        waypoint.pose.orientation.z = qz
+        waypoint.pose.orientation.w = qw
 
+        # Create goal message
         goal_msg = WaypointFollower.Goal()
         goal_msg.waypoint = waypoint
+
 
         fut = client.send_goal_async(goal_msg, feedback_callback=self._waypoint_feedback)
         fut.add_done_callback(lambda f: self._on_waypoint_response(f, done_cb))
@@ -198,7 +204,7 @@ def main(args=None):
             return
 
     """ ==============================================================================================="""
-    given_ids = [2, 6, 3]
+    given_ids = [1, 2, 3, 4]
 
     filtered_waypoints = filtered_waypoints_by_ids(data, given_ids)
 
