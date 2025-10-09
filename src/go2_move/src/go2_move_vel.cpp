@@ -38,7 +38,7 @@ private:
     void cmdVelCallback(const geometry_msgs::msg::TwistStamped::SharedPtr msg)
     {
         // Forward the received command to /cmd_vel topic
-        cmd_vel_pub_->publish(*msg);
+        // cmd_vel_pub_->publish(*msg);  // Commented out for debugging real robot movement
         
         // Send to Unitree API
         unitree_api::msg::Request req;

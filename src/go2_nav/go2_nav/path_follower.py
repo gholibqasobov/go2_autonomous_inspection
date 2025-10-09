@@ -23,10 +23,10 @@ class PathFollower(Node):
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
         # Control parameters - Optimized for better path following
-        self.k_linear = 0.8          # Linear velocity gain (reduced for stability) 0.8
-        self.k_angular = 3.0         # Angular velocity gain (increased for better steering) 3.0
-        self.max_linear_vel = 0.5    # Maximum linear velocity (reduced for control)
-        self.max_angular_vel = 1.0   # Maximum angular velocity (slightly increased) 1.2
+        self.k_linear = 2.0          # Linear velocity gain (reduced for stability) 0.8
+        self.k_angular = 6.0         # Angular velocity gain (increased for better steering) 3.0
+        self.max_linear_vel = 2.0    # Maximum linear velocity (reduced for control)
+        self.max_angular_vel = 3.0   # Maximum angular velocity (slightly increased) 1.2
         self.goal_tolerance = 0.18   # Distance tolerance to waypoint (tighter) 12
         self.angle_tolerance = 0.15   # Angle tolerance (tighter for precision)
         self.lookahead_distance = 0.4 # Lookahead distance (reduced for tighter following)
