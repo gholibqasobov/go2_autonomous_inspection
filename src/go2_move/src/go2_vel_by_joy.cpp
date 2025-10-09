@@ -32,11 +32,9 @@ private:
         joy_msg.header.frame_id = "teleop_panel";
 
         // Create 8 axes and 11 buttons (typical Joy message structure)
-        joy_msg.axes.resize(8, 0.0);
-        joy_msg.buttons.resize(11, 0);
 
         // Example joystick data
-        joy_msg.axes = {1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0}; // index 0: rotat.z, index 3: linear.y, index 4: linear.x, index 5: manual_mode;
+        joy_msg.axes = {msg->twist.angular.z, 0.0, 0.0, 0.0, msg->twist.linear.x, -1.0, 0.0, 0.0}; // index 0: rotat.z, index 3: linear.y, index 4: linear.x, index 5: manual_mode;
         joy_msg.buttons = {0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0}; 
 
         // Map linear and angular values from cmd_vel to Joy axes

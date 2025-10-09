@@ -11,10 +11,6 @@ sleep 5
 # start map
 gnome-terminal -- bash -c "ros2 launch test_map_ws/src/map_provider/launch/map_provider2.launch.py; exec bash"
 
-# cmd_vel publisher
-#gnome-terminal -- bash -c "ros2 run go2_move go2_move_vel; exec bash"
-#sleep 1
-
 # joy publisher
 gnome-terminal -- bash -c "ros2 run go2_move go2_vel_by_joy; exec bash"
 sleep 1
