@@ -35,12 +35,16 @@ private:
         joy_msg.axes.resize(8, 0.0);
         joy_msg.buttons.resize(11, 0);
 
+        // Example joystick data
+        joy_msg.axes = {1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0}; // index 0: rotat.z, index 3: linear.y, index 4: linear.x, index 5: manual_mode;
+        joy_msg.buttons = {0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0}; 
+
         // Map linear and angular values from cmd_vel to Joy axes
         // Example mapping:
         //   - index 4: linear.x  (forward/backward)
         //   - index 0: angular.z (rotation)
-        joy_msg.axes[4] = msg->twist.linear.x;   // forward/backward
-        joy_msg.axes[0] = msg->twist.angular.z;  // turning
+        // joy_msg.axes[4] = msg->twist.linear.x;   // forward/backward
+        // joy_msg.axes[5] = 1;  // turning
 
         // Optional: enable "manual mode" with a virtual button (index 5)
         
@@ -50,7 +54,7 @@ private:
         //    checkObstacle = false;
         //}
         
-        joy_msg.axes[5] = 1.0;  // e.g., 1 = manual control active
+        // joy_msg.axes[5] = 1.0;  // e.g., 1 = manual control active
 
         RCLCPP_INFO(this->get_logger(), "Publishing Joy: linear=%.2f angular=%.2f",
                     msg->twist.linear.x, msg->twist.angular.z);
