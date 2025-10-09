@@ -7,6 +7,7 @@ from geometry_msgs.msg import PointStamped
 from go2_interfaces.action import WaypointFollower, RotateRobotAngle, DetectClosest
 import yaml
 from go2_waypoint_nav.open_inspection_ids import get_waypoints_by_ids, combine_sequence
+from go2_waypoint_nav.generate_inspection_points import generate_object_inspection_points, filtered_waypoints_by_ids, get_waypoint_by_id
 
 class CombinedActionClient(Node):
     def __init__(self):
@@ -196,18 +197,22 @@ def main(args=None):
             print(exc)
             return
 
-    waypoints = []
-    orientations = []
+    # waypoints = []
+    # orientations = []
 
-    """Get position and orientation for a given list of IDs"""
-    given_ids = [1, 2, 3]  # List of IDs to filter for
+    # """Get position and orientation for a given list of IDs"""
+    # given_ids = [1, 2, 3]  # List of IDs to filter for
 
-    waypoints, orientations = get_waypoints_by_ids(data, given_ids)
+    # waypoints, orientations = get_waypoints_by_ids(data, given_ids)
 
-    combined_sequence = combine_sequence(waypoints, orientations)
+    # combined_sequence = combine_sequence(waypoints, orientations)
 
+    """ ==============================================================================================="""
+    given_ids = [2, 6, 3]
 
+    filtered_waypoints = filtered_waypoints_by_ids(data, given_ids)
 
+    inspection_sequence = generate_object_inspection_points(filtered_waypoints)
 
 
     """============================================================"""
@@ -241,7 +246,7 @@ def main(args=None):
     # Example adding DetectClosest step somewhere in sequence:
     # combined_sequence.append({'type': 'detect_closest', 'class_name': 'crack', 'timeout': 20.0, 'confirm_frames': 3, 'require_depth': False})
 
-    node.run_sequence(combined_sequence)
+    node.run_sequence(inspection_sequence)
 
     try:
         executor.spin()
