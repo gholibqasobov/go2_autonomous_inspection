@@ -197,16 +197,6 @@ def main(args=None):
             print(exc)
             return
 
-    # waypoints = []
-    # orientations = []
-
-    # """Get position and orientation for a given list of IDs"""
-    # given_ids = [1, 2, 3]  # List of IDs to filter for
-
-    # waypoints, orientations = get_waypoints_by_ids(data, given_ids)
-
-    # combined_sequence = combine_sequence(waypoints, orientations)
-
     """ ==============================================================================================="""
     given_ids = [2, 6, 3]
 
@@ -214,37 +204,7 @@ def main(args=None):
 
     inspection_sequence = generate_object_inspection_points(filtered_waypoints)
 
-
     """============================================================"""
-
-    # for i in range(len(data['waypoints'])):
-    #     orientation = data['waypoints'][i]['pose']['orientation']
-    #     position = data['waypoints'][i]['pose']['position']
-
-    #     theta = orientation['z']  # or orientation['w'] if that is the correct yaw
-    #     x, y, z = position['x'], position['y'], position['z']
-
-    #     waypoints.append({'type': 'waypoint_follower', 'x': x, 'y': y, 'z': z})
-    #     orientations.append({'type': 'rotate_robot', 'theta': theta})
-
-
-    # for wp, ori in zip(waypoints, orientations):
-    #     combined_sequence.append(wp)
-    #     combined_sequence.append(ori)
-    # sequence = [
-    #     {'type': 'waypoint_follower', 'x': 2.0, 'y': -2.0, 'z': 0.0},
-    #     {'type': 'rotate_robot', 'theta': 0.5},
-    #     {'type': 'detect_closest', 'class_name': 'light_off', 'timeout': 20.0, 'confirm_frames': 3, 'require_depth': False},
-    #     {'type': 'waypoint_follower', 'x': 6.0, 'y': -7.0, 'z': 0.0},
-    #     {'type': 'rotate_robot', 'theta': -0.5},
-    #     {'type': 'detect_closest', 'class_name': 'fire_extinguisher', 'timeout': 20.0, 'confirm_frames': 3, 'require_depth': False},
-    #     {'type': 'waypoint_follower', 'x': 7.0, 'y': -8.0, 'z': 0.0},
-    #     {'type': 'rotate_robot', 'theta': 1.0}
-    # ]
-
-
-    # Example adding DetectClosest step somewhere in sequence:
-    # combined_sequence.append({'type': 'detect_closest', 'class_name': 'crack', 'timeout': 20.0, 'confirm_frames': 3, 'require_depth': False})
 
     node.run_sequence(inspection_sequence)
 
