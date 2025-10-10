@@ -205,7 +205,7 @@ def main(args=None):
 
     """ ==============================================================================================="""
     # given_ids = [4, 3, 1]
-    given_ids = list(map(int, input("Enter IDs separated by spaces: ").split()))
+    given_ids = list(map(str, input("Enter IDs separated by spaces: ").split()))
 
     filtered_waypoints = filtered_waypoints_by_ids(data, given_ids)
 
