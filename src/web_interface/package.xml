@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>web_interface</name>
+  <version>0.1.0</version>
+  <description>Web-based control interface for the Unitree Go2 quadruped robot.</description>
+  <maintainer email="example@example.com">Unitree Go2 Team</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>tf2_msgs</exec_depend>
+  <exec_depend>python3-flask</exec_depend>
+  <exec_depend>python3-flask-cors</exec_depend>
+  <exec_depend>python3-pil</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

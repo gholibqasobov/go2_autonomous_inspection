@@ -1,0 +1,2 @@
+recursive-include web_interface/web *
+recursive-include web_interface/maps *

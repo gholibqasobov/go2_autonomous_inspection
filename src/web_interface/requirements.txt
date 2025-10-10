@@ -1,0 +1,16 @@
+Flask==3.0.0
+Flask-CORS==4.0.0
+PyYAML==6.0.1
+Pillow==10.1.0
+
+# ROS2 dependencies (install via system package manager, not pip):
+# For ROS2 integration, you need to have ROS2 installed and sourced
+# Install ROS2 following: https://docs.ros.org/en/humble/Installation.html
+#
+# Required ROS2 packages:
+# - rclpy (ros-humble-rclpy or ros-iron-rclpy)
+# - geometry-msgs (ros-humble-geometry-msgs or ros-iron-geometry-msgs)
+# - nav-msgs (ros-humble-nav-msgs or ros-iron-nav-msgs)
+#
+# Install via apt:
+# sudo apt install ros-$ROS_DISTRO-rclpy ros-$ROS_DISTRO-geometry-msgs ros-$ROS_DISTRO-nav-msgs

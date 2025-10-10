@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unitree Go2 Control</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="layout">
+            <!-- Map Canvas Area -->
+            <div class="map-panel resizable-panel" id="map-panel">
+                <div class="map-header">
+                    <select id="map-selector" class="map-selector">
+                        <option value="">Loading maps...</option>
+                    </select>
+                </div>
+                <div class="canvas-container">
+                    <canvas id="map-canvas"></canvas>
+                    <div id="loading-overlay" class="loading-overlay">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Horizontal Resize Handle -->
+            <div class="resize-handle resize-handle-horizontal" id="horizontal-resizer"></div>
+
+            <!-- Side Panels -->
+            <div class="side-panel">
+                <div class="panel camera-panel resizable-panel" id="camera-panel">
+                    <h3 class="panel-title">Camera</h3>
+                    <div class="camera-container">
+                        <img id="camera-feed" alt="Live camera feed" />
+                        <div class="camera-overlay">
+                            <span id="camera-status" class="camera-status-badge">Waiting for frames...</span>
+                            <span id="camera-resolution" class="camera-resolution-badge"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vertical Resize Handle -->
+                <div class="resize-handle resize-handle-vertical" id="vertical-resizer"></div>
+
+                <div class="panel info-panel resizable-panel" id="info-panel">
+                    <div class="status-section">
+                        <div class="status-item">
+                            <span class="status-label">Connection:</span>
+                            <span id="connection-status" class="status-connected">Connected</span>
+                        </div>
+                    </div>
+
+                    <div class="status-section">
+                        <h3>Robot Position</h3>
+                        <div class="info-row">
+                            <span class="info-label">X:</span>
+                            <span id="robot-x-display" class="info-value">0.00 m</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Y:</span>
+                            <span id="robot-y-display" class="info-value">0.00 m</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">θ:</span>
+                            <span id="robot-theta-display" class="info-value">0.00 rad</span>
+                        </div>
+                    </div>
+
+                    <div class="status-section">
+                        <h3>Goal Destination</h3>
+                        <div class="info-row">
+                            <span class="info-label">X:</span>
+                            <span id="goal-x-display" class="info-value">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Y:</span>
+                            <span id="goal-y-display" class="info-value">-</span>
+                        </div>
+                        <button id="clear-goal-btn" class="btn">Clear Goal</button>
+                    </div>
+
+                    <div class="status-section">
+                        <h3>Map Information</h3>
+                        <div class="info-row">
+                            <span class="info-label">Resolution:</span>
+                            <span id="map-resolution" class="info-value">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Size:</span>
+                            <span id="map-size" class="info-value">-</span>
+                        </div>
+                    </div>
+
+                    <div class="status-section">
+                        <h3>Operating Mode</h3>
+                        <div class="info-row">
+                            <span class="info-label">Current:</span>
+                            <span id="mode-status" class="info-value">None</span>
+                        </div>
+                        <div class="mode-buttons">
+                            <button id="simulation-mode-btn" class="btn mode-btn">Simulation</button>
+                            <button id="real-mode-btn" class="btn mode-btn">Real</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
