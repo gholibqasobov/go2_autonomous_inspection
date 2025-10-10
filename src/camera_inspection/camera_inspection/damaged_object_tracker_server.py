@@ -322,16 +322,15 @@ class DamagedObjectTrackerServer(Node):
 
     def wait_for_camera_stable(self, max_wait_s=3.0):
         """Wait briefly for servo motion to settle using existing motion gating state."""
+        import time
         start = self.get_clock().now().nanoseconds / 1e9
-        rate = self.create_rate(20)  # 20 Hz for responsive checking
         # Give a small lead time after command
-        for _ in range(4):  # 0.2s at 20 Hz
-            rate.sleep()
+        time.sleep(0.2)
         while (self.servo_motion_detected or self.camera_is_moving):
             now = self.get_clock().now().nanoseconds / 1e9
             if now - start >= max_wait_s:
                 break
-            rate.sleep()
+            time.sleep(0.01)  # 10ms minimal delay
 
     def run_camera_sequence(self, class_name, deadline_s=None):
         """Run the configured camera motion sequence for a class, if present.
@@ -371,12 +370,18 @@ class DamagedObjectTrackerServer(Node):
                 self.wait_for_camera_stable(max_wait_s=min(3.0, st['wait_s']))
                 # Let perception run at this pose, check periodically for stop conditions
                 remain = max(0.0, float(st['wait_s']))
-                rate = self.create_rate(10)  # 10 Hz - allows callbacks to run between sleeps
+                import time
                 start_wait = self.get_clock().now().nanoseconds / 1e9
-                waited = 0.0
-                while waited < remain:
+
+                while True:
+                    now = self.get_clock().now().nanoseconds / 1e9
+                    waited = now - start_wait
+
+                    if waited >= remain:
+                        break
                     if should_stop():
                         return True
+
                     # Emit lightweight feedback while scanning poses
                     try:
                         if self.current_goal_handle:
@@ -389,10 +394,9 @@ class DamagedObjectTrackerServer(Node):
                             self.current_goal_handle.publish_feedback(fb)
                     except Exception:
                         pass
-                    # Use rate.sleep() instead of spin_once to avoid executor reentry
-                    rate.sleep()
-                    now = self.get_clock().now().nanoseconds / 1e9
-                    waited = now - start_wait
+
+                    # Minimal sleep to allow callbacks to execute without blocking
+                    time.sleep(0.01)  # 10ms - much less overhead than rate.sleep()
             if not self.sequence_repeat:
                 break
         return True
