@@ -395,8 +395,8 @@ class DamagedObjectTrackerServer(Node):
                     except Exception:
                         pass
 
-                    # Minimal sleep to allow callbacks to execute without blocking
-                    time.sleep(0.01)  # 10ms - much less overhead than rate.sleep()
+                    # Sleep ~100ms to match YOLO inference rate (~200ms) while allowing callbacks
+                    time.sleep(0.1)
             if not self.sequence_repeat:
                 break
         return True
