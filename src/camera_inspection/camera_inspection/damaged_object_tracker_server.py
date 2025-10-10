@@ -345,8 +345,8 @@ class DamagedObjectTrackerServer(Node):
         def should_stop():
             if self.current_goal_handle and self.current_goal_handle.is_cancel_requested:
                 return True
-            if self.session_saved:
-                return True
+            # Allow full servo sequence to complete even if object is found/saved
+            # This ensures we scan the entire configured area
             if deadline_s is not None:
                 now_s = self.get_clock().now().nanoseconds / 1e9
                 if now_s >= deadline_s:
