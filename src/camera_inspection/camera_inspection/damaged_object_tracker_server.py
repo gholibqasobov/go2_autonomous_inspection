@@ -933,8 +933,12 @@ class DamagedObjectTrackerServer(Node):
             
             self.last_gray = gray
 
-            # Skip detection if camera is moving, UNLESS we have an active session (need to detect during servo sequence)
-            if self.camera_is_moving and not self.disable_motion_gating and not self.session_active:
+            # Skip detection if camera is moving, UNLESS:
+            # 1. Motion gating is disabled globally, OR
+            # 2. We have an active session (must detect during servo sequence)
+            skip_detection = self.camera_is_moving and not self.disable_motion_gating and not self.session_active
+
+            if skip_detection:
                 motion_reason = []
                 if frame_motion_detected:
                     motion_reason.append(f"frame_motion({moving_pixels}px)")
@@ -943,12 +947,24 @@ class DamagedObjectTrackerServer(Node):
 
                 self.get_logger().debug(f"Camera moving - {', '.join(motion_reason)} - skipping detection")
                 return
+
+            # Log when detecting during motion in active session
+            if self.camera_is_moving and self.session_active:
+                self.get_logger().debug(f"Detecting during camera motion (session active for '{self.session_target_class}')")
             
             # Run YOLO detection
             results = self.model(frame)[0]
             xyxy = results.boxes.xyxy.cpu().numpy()
             scores = results.boxes.conf.cpu().numpy()
             classes = results.boxes.cls.cpu().numpy()
+
+            # Log raw detections during active session
+            if self.session_active:
+                if len(xyxy) > 0:
+                    detected_class_names = [self.model.names.get(int(cls), str(cls)) for cls in classes]
+                    self.get_logger().info(f"YOLO detected {len(xyxy)} objects: {detected_class_names} (scores: {[f'{s:.2f}' for s in scores]})")
+                else:
+                    self.get_logger().debug(f"YOLO detected 0 objects (target: '{self.session_target_class}')")
             
             # Convert to DeepSORT format
             raw_dets = []
