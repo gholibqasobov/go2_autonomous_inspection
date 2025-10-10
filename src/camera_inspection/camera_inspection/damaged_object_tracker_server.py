@@ -619,10 +619,21 @@ class DamagedObjectTrackerServer(Node):
             goal_handle.succeed()  # Action succeeded (completed normally), but object not found
             self.get_logger().info(f'DetectClosest session completed: no object of class \'{class_name}\' found')
 
-        # Cleanup
-        if self.session_started_inspection:
-            self._stop_inspection()
+        # Cleanup - clear session state but keep inspection running to avoid destroying subscriptions mid-execution
+        # Only stop inspection if we started it for this session AND we're in a safe state
         self._clear_session()
+
+        # Stop inspection AFTER returning to avoid destroying handles while executor is using them
+        if self.session_started_inspection:
+            # Schedule inspection stop for next iteration to avoid InvalidHandle errors
+            def delayed_stop():
+                import time
+                time.sleep(0.1)  # Small delay to let executor finish current iteration
+                if self.inspection_active:
+                    self._stop_inspection()
+
+            import threading
+            threading.Thread(target=delayed_stop, daemon=True).start()
 
         return result
     
@@ -999,6 +1010,14 @@ class DamagedObjectTrackerServer(Node):
                 candidates = [o for o in detected_objects if o['class_name'] == self.session_target_class]
                 self.session_candidates = len(candidates)
                 self.session_depth_ready = self.depth_image is not None
+
+                # Log all detected objects during session for debugging
+                if detected_objects:
+                    detected_classes = [o['class_name'] for o in detected_objects]
+                    self.get_logger().info(
+                        f"Session active, detected classes: {detected_classes}, "
+                        f"target='{self.session_target_class}', candidates={len(candidates)}"
+                    )
 
                 if candidates:
                     h, w = frame.shape[:2]
