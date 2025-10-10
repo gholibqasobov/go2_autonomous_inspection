@@ -60,6 +60,11 @@ class DamagedObjectTrackerServer(Node):
         # Initialize CV bridge and YOLO model
         self.cv_bridge = CvBridge()
         self.model = YOLO('src/camera_inspection/model/damaged_object_yolo.pt')
+
+        # Warmup YOLO model to avoid slow first inference
+        dummy_frame = np.zeros((640, 640, 3), dtype=np.uint8)
+        _ = self.model(dummy_frame, verbose=False)
+        self.get_logger().info('YOLO model warmed up and ready')
         
         # Object tracking parameters (configurable via ROS params)
         # Defaults chosen for moderate sensitivity; can be overridden at runtime
@@ -557,27 +562,30 @@ class DamagedObjectTrackerServer(Node):
         self.session_target_class = class_name
         self.session_require_depth = require_depth
         self.session_confirm_frames = confirm_frames
-        self.session_deadline = self.get_clock().now().nanoseconds / 1e9 + timeout_s
         self.session_saved = False
         self.session_result_info = None
         self.get_logger().info(
             f"DetectClosest session started: class='{class_name}', timeout={timeout_s}s, confirm_frames={confirm_frames}, require_depth={require_depth}"
         )
 
-        # Pre-scan: either run a per-class sequence or a single alignment
+        # Run servo sequence - detection happens DURING the sequence
         try:
-            # Compute deadline for pre-scan as session deadline to avoid overruns
-            ran_sequence = self.run_camera_sequence(class_name, deadline_s=self.session_deadline)
+            ran_sequence = self.run_camera_sequence(class_name, deadline_s=None)
             if not ran_sequence:
                 if self.set_camera_for_class(class_name):
                     self.wait_for_camera_stable(max_wait_s=3.0)
         except Exception as e:
-            self.get_logger().warn(f"Pre-scan alignment/sequence failed: {e}")
+            self.get_logger().warn(f"Servo sequence failed: {e}")
 
-        # If object already saved during pre-scan, short-circuit and return
+        # Servo sequence complete - check if object was found and saved during sequence
+        self.get_logger().info(f"Servo sequence complete for class '{class_name}'")
+
+        # Build result based on whether object was saved during sequence
+        result = DetectClosest.Result()
+
         if self.session_saved and self.session_result_info is not None:
+            # Success: object was found and saved during servo sequence
             info = self.session_result_info
-            result = DetectClosest.Result()
             result.success = True
             result.reason = 'saved'
             result.saved_id = int(info.get('id', -1))
@@ -597,90 +605,26 @@ class DamagedObjectTrackerServer(Node):
             result.timestamp = float(info.get('timestamp', 0.0))
 
             goal_handle.succeed()
-            if self.session_started_inspection:
-                self._stop_inspection()
-            self._clear_session()
-            self.get_logger().info('DetectClosest session completed during pre-scan')
-            return result
+            self.get_logger().info(f'DetectClosest session completed: found object ID {result.saved_id}')
+        else:
+            # Not found: no object detected during servo sequence
+            result.success = False
+            result.reason = 'not_found'
+            result.saved_id = -1
+            result.bbox_x1 = result.bbox_y1 = result.bbox_x2 = result.bbox_y2 = 0
+            result.world_x = result.world_y = result.world_z = 0.0
+            result.image_file = ''
+            result.timestamp = 0.0
 
-        # Feedback loop until saved/timeout/cancel
-        rate_hz = 5.0
-        period = 1.0 / rate_hz
-        import time
-        while rclpy.ok():
-            # Handle cancel
-            if goal_handle.is_cancel_requested:
-                self.get_logger().info('DetectClosest canceled by client')
-                goal_handle.canceled()
-                if self.session_started_inspection:
-                    self._stop_inspection()
-                self._clear_session()
-                result = DetectClosest.Result()
-                result.success = False
-                result.reason = 'canceled'
-                result.saved_id = -1
-                result.bbox_x1 = result.bbox_y1 = result.bbox_x2 = result.bbox_y2 = 0
-                result.world_x = result.world_y = result.world_z = 0.0
-                result.image_file = ''
-                result.timestamp = 0.0
-                return result
+            goal_handle.succeed()  # Action succeeded (completed normally), but object not found
+            self.get_logger().info(f'DetectClosest session completed: no object of class \'{class_name}\' found')
 
-            # Publish feedback
-            fb = DetectClosest.Feedback()
-            fb.active_class = class_name
-            fb.closest_px_dist = float(self.session_closest_px_dist if self.session_closest_px_dist != float('inf') else -1.0)
-            fb.candidates = int(self.session_candidates)
-            fb.camera_moving = bool(self.camera_is_moving)
-            fb.depth_ready = bool(self.depth_image is not None)
-            goal_handle.publish_feedback(fb)
+        # Cleanup
+        if self.session_started_inspection:
+            self._stop_inspection()
+        self._clear_session()
 
-            # Check success
-            if self.session_saved and self.session_result_info is not None:
-                info = self.session_result_info
-                result = DetectClosest.Result()
-                result.success = True
-                result.reason = 'saved'
-                result.saved_id = int(info.get('id', -1))
-                x1, y1, x2, y2 = info.get('bbox', (0, 0, 0, 0))
-                result.bbox_x1 = int(x1)
-                result.bbox_y1 = int(y1)
-                result.bbox_x2 = int(x2)
-                result.bbox_y2 = int(y2)
-                pos = info.get('world_position')
-                if pos:
-                    result.world_x = float(pos[0])
-                    result.world_y = float(pos[1])
-                    result.world_z = float(pos[2])
-                else:
-                    result.world_x = result.world_y = result.world_z = 0.0
-                result.image_file = info.get('image_file', '')
-                result.timestamp = float(info.get('timestamp', 0.0))
-
-                goal_handle.succeed()
-                if self.session_started_inspection:
-                    self._stop_inspection()
-                self._clear_session()
-                self.get_logger().info('DetectClosest session completed successfully')
-                return result
-
-            # Check timeout
-            now_s = self.get_clock().now().nanoseconds / 1e9
-            if now_s >= self.session_deadline:
-                self.get_logger().info('DetectClosest session timed out')
-                if self.session_started_inspection:
-                    self._stop_inspection()
-                self._clear_session()
-                result = DetectClosest.Result()
-                result.success = False
-                result.reason = 'timeout'
-                result.saved_id = -1
-                result.bbox_x1 = result.bbox_y1 = result.bbox_x2 = result.bbox_y2 = 0
-                result.world_x = result.world_y = result.world_z = 0.0
-                result.image_file = ''
-                result.timestamp = 0.0
-                return result
-
-            time.sleep(period)
+        return result
     
     def _init_saved_positions_from_data(self):
         """Initialize the saved positions dictionary from loaded object data"""
@@ -960,14 +904,15 @@ class DamagedObjectTrackerServer(Node):
             self.camera_is_moving = frame_motion_detected or self.servo_motion_detected
             
             self.last_gray = gray
-            
-            if self.camera_is_moving and not self.disable_motion_gating:
+
+            # Skip detection if camera is moving, UNLESS we have an active session (need to detect during servo sequence)
+            if self.camera_is_moving and not self.disable_motion_gating and not self.session_active:
                 motion_reason = []
                 if frame_motion_detected:
                     motion_reason.append(f"frame_motion({moving_pixels}px)")
                 if self.servo_motion_detected:
                     motion_reason.append("servo_motion")
-                
+
                 self.get_logger().debug(f"Camera moving - {', '.join(motion_reason)} - skipping detection")
                 return
             
