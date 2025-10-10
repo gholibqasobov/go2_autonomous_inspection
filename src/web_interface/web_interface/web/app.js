@@ -43,6 +43,7 @@ class Go2Interface {
         await this.loadGoalPosition();
         await this.loadTrajectory();
         await this.loadMode();
+        await this.loadObjectIds();
         this.startCameraUpdates();
 
         // Start update loop
@@ -62,6 +63,9 @@ class Go2Interface {
         // Mode buttons
         document.getElementById('simulation-mode-btn').addEventListener('click', () => this.setMode('simulation'));
         document.getElementById('real-mode-btn').addEventListener('click', () => this.setMode('real'));
+
+        // Object IDs save button
+        document.getElementById('save-object-ids-btn').addEventListener('click', () => this.saveObjectIds());
 
         // Window resize
         window.addEventListener('resize', () => this.resizeCanvas());
@@ -695,6 +699,46 @@ class Go2Interface {
             simulationBtn.classList.add('active');
         } else if (this.currentMode === 'real') {
             realBtn.classList.add('active');
+        }
+    }
+
+    async loadObjectIds() {
+        try {
+            const response = await fetch('/api/object_ids');
+            const data = await response.json();
+
+            if (data.success && data.object_ids) {
+                const textarea = document.getElementById('object-ids-input');
+                textarea.value = data.object_ids.join('\n');
+            }
+        } catch (error) {
+            console.error('Error loading object IDs:', error);
+        }
+    }
+
+    async saveObjectIds() {
+        try {
+            const textarea = document.getElementById('object-ids-input');
+            const objectIds = textarea.value
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0);
+
+            const response = await fetch('/api/object_ids', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ object_ids: objectIds })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                alert('Object IDs saved successfully!');
+            } else {
+                alert('Failed to save object IDs: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error saving object IDs:', error);
+            alert('Error saving object IDs: ' + error.message);
         }
     }
 }

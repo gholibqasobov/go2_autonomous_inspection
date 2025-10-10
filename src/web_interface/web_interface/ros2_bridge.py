@@ -1396,6 +1396,72 @@ def set_mode(mode: str):
         }), 500
 
 
+@app.route('/api/object_ids', methods=['GET'])
+def get_object_ids():
+    """Load object IDs from YAML file"""
+    object_ids_path = Path(MAP_BASE_PATH) / 'object_ids.yaml'
+
+    try:
+        if not object_ids_path.exists():
+            # Return empty list if file doesn't exist
+            return jsonify({
+                'success': True,
+                'object_ids': []
+            })
+
+        with open(object_ids_path, 'r') as f:
+            data = yaml.safe_load(f)
+
+        object_ids = data.get('object_ids', []) if data else []
+
+        return jsonify({
+            'success': True,
+            'object_ids': object_ids
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/object_ids', methods=['POST'])
+def save_object_ids():
+    """Save object IDs to YAML file"""
+    object_ids_path = Path(MAP_BASE_PATH) / 'object_ids.yaml'
+
+    try:
+        data = request.get_json()
+        object_ids = data.get('object_ids', [])
+
+        # Validate that object_ids is a list
+        if not isinstance(object_ids, list):
+            return jsonify({
+                'success': False,
+                'error': 'object_ids must be a list'
+            }), 400
+
+        # Save to YAML file
+        yaml_data = {
+            'object_ids': object_ids
+        }
+
+        with open(object_ids_path, 'w') as f:
+            yaml.dump(yaml_data, f, default_flow_style=False, sort_keys=False)
+
+        return jsonify({
+            'success': True,
+            'message': f'Saved {len(object_ids)} object IDs to {object_ids_path}'
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 # ============================================================================
 # Main Entry Point
 # ============================================================================
