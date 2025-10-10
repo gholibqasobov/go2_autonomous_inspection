@@ -323,14 +323,15 @@ class DamagedObjectTrackerServer(Node):
     def wait_for_camera_stable(self, max_wait_s=3.0):
         """Wait briefly for servo motion to settle using existing motion gating state."""
         start = self.get_clock().now().nanoseconds / 1e9
-        import time
+        rate = self.create_rate(20)  # 20 Hz for responsive checking
         # Give a small lead time after command
-        time.sleep(0.2)
+        for _ in range(4):  # 0.2s at 20 Hz
+            rate.sleep()
         while (self.servo_motion_detected or self.camera_is_moving):
             now = self.get_clock().now().nanoseconds / 1e9
             if now - start >= max_wait_s:
                 break
-            time.sleep(0.05)
+            rate.sleep()
 
     def run_camera_sequence(self, class_name, deadline_s=None):
         """Run the configured camera motion sequence for a class, if present.
@@ -370,7 +371,7 @@ class DamagedObjectTrackerServer(Node):
                 self.wait_for_camera_stable(max_wait_s=min(3.0, st['wait_s']))
                 # Let perception run at this pose, check periodically for stop conditions
                 remain = max(0.0, float(st['wait_s']))
-                slice_s = 0.1
+                rate = self.create_rate(10)  # 10 Hz - allows callbacks to run between sleeps
                 start_wait = self.get_clock().now().nanoseconds / 1e9
                 waited = 0.0
                 while waited < remain:
@@ -388,8 +389,8 @@ class DamagedObjectTrackerServer(Node):
                             self.current_goal_handle.publish_feedback(fb)
                     except Exception:
                         pass
-                    # Use spin_once instead of sleep to allow callbacks to execute
-                    rclpy.spin_once(self, timeout_sec=min(slice_s, remain - waited))
+                    # Use rate.sleep() instead of spin_once to avoid executor reentry
+                    rate.sleep()
                     now = self.get_clock().now().nanoseconds / 1e9
                     waited = now - start_wait
             if not self.sequence_repeat:
