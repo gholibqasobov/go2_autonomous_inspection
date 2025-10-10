@@ -65,7 +65,10 @@ class DamagedObjectTrackerServer(Node):
         dummy_frame = np.zeros((640, 640, 3), dtype=np.uint8)
         _ = self.model(dummy_frame, verbose=False)
         self.get_logger().info('YOLO model warmed up and ready')
-        
+
+        # Create a reusable Rate object for servo sequence timing (10 Hz = 100ms)
+        self.sequence_rate = self.create_rate(10)
+
         # Object tracking parameters (configurable via ROS params)
         # Defaults chosen for moderate sensitivity; can be overridden at runtime
         self.declare_parameter('conf_thresh', 0.5)
@@ -370,7 +373,6 @@ class DamagedObjectTrackerServer(Node):
                 self.wait_for_camera_stable(max_wait_s=min(3.0, st['wait_s']))
                 # Let perception run at this pose, check periodically for stop conditions
                 remain = max(0.0, float(st['wait_s']))
-                import time
                 start_wait = self.get_clock().now().nanoseconds / 1e9
 
                 while True:
@@ -395,8 +397,12 @@ class DamagedObjectTrackerServer(Node):
                     except Exception:
                         pass
 
-                    # Sleep ~100ms to match YOLO inference rate (~200ms) while allowing callbacks
-                    time.sleep(0.1)
+                    # Use reusable Rate.sleep() which properly yields to executor between sleeps
+                    try:
+                        self.sequence_rate.sleep()
+                    except Exception:
+                        # Rate might raise if node is shutting down
+                        break
             if not self.sequence_repeat:
                 break
         return True
