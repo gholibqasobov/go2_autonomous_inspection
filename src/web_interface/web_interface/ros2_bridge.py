@@ -1399,7 +1399,7 @@ def set_mode(mode: str):
 @app.route('/api/object_ids', methods=['GET'])
 def get_object_ids():
     """Load object IDs from YAML file"""
-    object_ids_path = Path(MAP_BASE_PATH) / 'object_ids.yaml'
+    object_ids_path = Path(MAP_BASE_PATH).parent / 'object_list' / 'object_ids.yaml'
 
     try:
         if not object_ids_path.exists():
@@ -1429,7 +1429,7 @@ def get_object_ids():
 @app.route('/api/object_ids', methods=['POST'])
 def save_object_ids():
     """Save object IDs to YAML file"""
-    object_ids_path = Path(MAP_BASE_PATH) / 'object_ids.yaml'
+    object_ids_path = Path(MAP_BASE_PATH).parent / 'object_list' / 'object_ids.yaml'
 
     try:
         data = request.get_json()
