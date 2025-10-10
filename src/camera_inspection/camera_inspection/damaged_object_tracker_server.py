@@ -353,7 +353,6 @@ class DamagedObjectTrackerServer(Node):
                     return True
             return False
 
-        import time
         while True:
             for st in steps:
                 if should_stop():
@@ -372,6 +371,7 @@ class DamagedObjectTrackerServer(Node):
                 # Let perception run at this pose, check periodically for stop conditions
                 remain = max(0.0, float(st['wait_s']))
                 slice_s = 0.1
+                start_wait = self.get_clock().now().nanoseconds / 1e9
                 waited = 0.0
                 while waited < remain:
                     if should_stop():
@@ -388,8 +388,10 @@ class DamagedObjectTrackerServer(Node):
                             self.current_goal_handle.publish_feedback(fb)
                     except Exception:
                         pass
-                    time.sleep(min(slice_s, remain - waited))
-                    waited += slice_s
+                    # Use spin_once instead of sleep to allow callbacks to execute
+                    rclpy.spin_once(self, timeout_sec=min(slice_s, remain - waited))
+                    now = self.get_clock().now().nanoseconds / 1e9
+                    waited = now - start_wait
             if not self.sequence_repeat:
                 break
         return True
@@ -895,7 +897,11 @@ class DamagedObjectTrackerServer(Node):
         """Process camera images and track damaged objects"""
         if not self.inspection_active:
             return
-            
+
+        # Log callback execution during active session for debugging
+        if self.session_active:
+            self.get_logger().debug(f"Camera callback executing during session (target: {self.session_target_class})")
+
         try:
             frame = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
             self.color_image_shape = frame.shape[:2]  # Store color image shape (height, width)
