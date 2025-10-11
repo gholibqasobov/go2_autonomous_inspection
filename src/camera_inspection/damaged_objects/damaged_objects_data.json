@@ -147,5 +147,28 @@
     },
     "world_position": null,
     "transformation_success": false
+  },
+  {
+    "id": 8345,
+    "class_name": "light_on",
+    "image_file": "object_8345_20251011_161938.jpg",
+    "timestamp": 1760181571.9318964,
+    "bbox": {
+      "x1": 386,
+      "y1": 43,
+      "x2": 795,
+      "y2": 483
+    },
+    "robot_position": {
+      "x": 1.3207722902297974,
+      "y": 0.17093920707702637,
+      "z": 0.3659999966621399
+    },
+    "world_position": {
+      "x": 1.967874679032644,
+      "y": 0.04430895520853889,
+      "z": 0.47609832322167517
+    },
+    "transformation_success": true
   }
 ]

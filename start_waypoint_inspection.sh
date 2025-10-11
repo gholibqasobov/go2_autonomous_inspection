@@ -5,8 +5,8 @@ echo "Changing to home directory..."
 cd ~
 
 # Unity Simulation
-gnome-terminal -- bash -c "./autonomy_stack_go2/system_simulation.sh; exec bash"
-sleep 5
+#gnome-terminal -- bash -c "./autonomy_stack_go2/system_simulation.sh; exec bash"
+#sleep 5
 
 # start map
 gnome-terminal -- bash -c "ros2 launch test_map_ws/src/map_provider/launch/map_provider2.launch.py; exec bash"
