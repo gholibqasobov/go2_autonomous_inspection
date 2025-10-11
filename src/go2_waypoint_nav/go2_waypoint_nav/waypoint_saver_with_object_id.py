@@ -24,7 +24,7 @@ class GoalPoseSubscriber(Node):
     def listener_callback(self, msg):
 
         try:
-            object_id = int(input("Enter object ID for this waypoint: "))
+            object_id = input("Enter object ID for this waypoint (room:class:id) : ")
         except ValueError:
             object_id = -1
             self.get_logger().info("Invalid input. Saving object_id as -1")

@@ -67,5 +67,85 @@
       "z": 0.04357870444974829
     },
     "transformation_success": true
+  },
+  {
+    "id": "2",
+    "class_name": "half_working_light",
+    "image_file": "object_2_20251010_154527.jpg",
+    "timestamp": 1760093100.9782517,
+    "bbox": {
+      "x1": 0,
+      "y1": 136,
+      "x2": 182,
+      "y2": 452
+    },
+    "robot_position": {
+      "x": 1.9723409414291382,
+      "y": 0.21902085840702057,
+      "z": 0.3659999966621399
+    },
+    "world_position": null,
+    "transformation_success": false
+  },
+  {
+    "id": "4",
+    "class_name": "light_on",
+    "image_file": "object_4_20251010_154600.jpg",
+    "timestamp": 1760093159.9817386,
+    "bbox": {
+      "x1": 330,
+      "y1": 51,
+      "x2": 799,
+      "y2": 372
+    },
+    "robot_position": {
+      "x": 4.411709308624268,
+      "y": -1.1620750427246094,
+      "z": 0.3659999966621399
+    },
+    "world_position": {
+      "x": 4.9324986818500385,
+      "y": -1.4938482841278007,
+      "z": 2.766633879388391
+    },
+    "transformation_success": true
+  },
+  {
+    "id": "5",
+    "class_name": "half_working_light",
+    "image_file": "object_5_20251010_154600.jpg",
+    "timestamp": 1760093160.0486383,
+    "bbox": {
+      "x1": 734,
+      "y1": 186,
+      "x2": 1133,
+      "y2": 460
+    },
+    "robot_position": {
+      "x": 4.411709308624268,
+      "y": -1.1620750427246094,
+      "z": 0.3659999966621399
+    },
+    "world_position": null,
+    "transformation_success": false
+  },
+  {
+    "id": "2",
+    "class_name": "light_on",
+    "image_file": "object_2_20251010_154754.jpg",
+    "timestamp": 1760093248.6816318,
+    "bbox": {
+      "x1": 454,
+      "y1": 36,
+      "x2": 917,
+      "y2": 424
+    },
+    "robot_position": {
+      "x": 4.414261341094971,
+      "y": -1.1487582921981812,
+      "z": 0.3659999966621399
+    },
+    "world_position": null,
+    "transformation_success": false
   }
 ]
