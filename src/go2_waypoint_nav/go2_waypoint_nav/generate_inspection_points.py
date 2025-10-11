@@ -61,7 +61,7 @@ def generate_object_inspection_points(waypoints):
         theta = orientation['z']
         
         inspection_points.append({'type': 'waypoint_follower', 'x': x, 'y': y, 'z': z})
-        inspection_points.append({'type': 'rotate_robot', 'theta': theta})
+        # inspection_points.append({'type': 'rotate_robot', 'theta': theta})
         # inspection_points.append({'type': 'detect_closest', 'class_name': obj_id.split(':')[1], 'timeout': 20.0, 'confirm_frames': 3, 'require_depth': False})
 
     

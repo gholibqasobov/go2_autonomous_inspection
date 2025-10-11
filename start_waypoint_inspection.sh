@@ -28,5 +28,20 @@ sleep 3
 gnome-terminal -- bash -c "ros2 run go2_nav path_follower; exec bash"
 sleep 1
 
+
+# Servo
+gnome-terminal -- bash -c "ros2 run camera_servo camera_servo_node; exec bash"
+sleep 1
+
+# Camera
+gnome-terminal -- bash -c "ros2 launch realsense2_camera rs_launch.py; exec bash"
+sleep 1
+
+cd ~/go2_autonomous_inspection
+
+# Detection
+gnome-terminal -- bash -c "ros2 run camera_inspection damaged_object_tracker_server --ros-args --params-file src/camera_inspection/config/detect_closest_params.yaml; exec bash"
+sleep 1
+
 echo "Started Global Navigation"
 
