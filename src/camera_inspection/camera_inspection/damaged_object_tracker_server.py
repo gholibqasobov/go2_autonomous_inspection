@@ -182,6 +182,16 @@ class DamagedObjectTrackerServer(Node):
         self.session_result_info = None
         self.current_goal_handle = None
         
+        # Timer-based servo sequence state machine
+        self.sequence_state = 'IDLE'  # States: IDLE, MOVING_TO_POSE, WAITING_AT_POSE, POST_SEQUENCE_TIMEOUT, COMPLETE
+        self.sequence_steps = []
+        self.sequence_step_index = 0
+        self.sequence_step_start_time = None
+        self.sequence_pose_start_time = None
+        self.sequence_timer = None
+        self.sequence_class_name = None
+        self.sequence_timer_period = 0.1  # 10 Hz timer
+        
         self.get_logger().info('Damaged Object Tracker Server initialized')
 
     def _load_class_servo_params(self):
@@ -346,77 +356,161 @@ class DamagedObjectTrackerServer(Node):
             except Exception:
                 break
 
-    def run_camera_sequence(self, class_name, deadline_s=None):
-        """Run the configured camera motion sequence for a class, if present.
+    def _sequence_timer_callback(self):
+        """Non-blocking timer callback to advance servo sequence state machine.
+        
+        This runs at 10 Hz and manages state transitions:
+        IDLE → MOVING_TO_POSE → WAITING_AT_POSE → (repeat or finish) → POST_SEQUENCE_TIMEOUT → COMPLETE
+        """
+        now_s = self.get_clock().now().nanoseconds / 1e9
+        
+        # Check for early exit conditions (cancel request or object found)
+        should_exit = False
+        if self.current_goal_handle and self.current_goal_handle.is_cancel_requested:
+            should_exit = True
+            self.get_logger().info("Sequence cancelled by client")
+        
+        # State: MOVING_TO_POSE - Waiting for camera to stabilize after servo command
+        if self.sequence_state == 'MOVING_TO_POSE':
+            # Check if camera has stabilized
+            if not self.servo_motion_detected and not self.camera_is_moving:
+                # Camera is stable, transition to waiting at pose
+                self.sequence_state = 'WAITING_AT_POSE'
+                self.sequence_pose_start_time = now_s
+                self.get_logger().info(f"Camera stabilized at pose {self.sequence_step_index + 1}/{len(self.sequence_steps)}")
+            else:
+                # Still moving, check for timeout
+                elapsed = now_s - self.sequence_step_start_time
+                if elapsed > 3.0:  # Max 3s to stabilize
+                    self.get_logger().warn(f"Camera stabilization timeout after {elapsed:.1f}s, proceeding anyway")
+                    self.sequence_state = 'WAITING_AT_POSE'
+                    self.sequence_pose_start_time = now_s
+        
+        # State: WAITING_AT_POSE - Collecting detections at current pose
+        elif self.sequence_state == 'WAITING_AT_POSE':
+            current_step = self.sequence_steps[self.sequence_step_index]
+            wait_s = current_step['wait_s']
+            elapsed = now_s - self.sequence_pose_start_time
+            
+            # Publish feedback while waiting
+            try:
+                if self.current_goal_handle:
+                    fb = DetectClosest.Feedback()
+                    fb.active_class = self.sequence_class_name
+                    fb.closest_px_dist = float(self.session_closest_px_dist if self.session_closest_px_dist != float('inf') else -1.0)
+                    fb.candidates = int(self.session_candidates)
+                    fb.camera_moving = bool(self.camera_is_moving)
+                    fb.depth_ready = bool(self.depth_image is not None)
+                    self.current_goal_handle.publish_feedback(fb)
+            except Exception:
+                pass
+            
+            # Check if we should move to next pose
+            if should_exit or elapsed >= wait_s:
+                self.sequence_step_index += 1
+                
+                # Check if more poses remain
+                if self.sequence_step_index < len(self.sequence_steps) and not should_exit:
+                    # Move to next pose
+                    next_step = self.sequence_steps[self.sequence_step_index]
+                    try:
+                        msg = StringMsg()
+                        msg.data = f"{next_step['tilt']} {next_step['pan']}"
+                        self.servo_move_pub.publish(msg)
+                        self.get_logger().info(
+                            f"Sequence move {self.sequence_step_index + 1}/{len(self.sequence_steps)} "
+                            f"for '{self.sequence_class_name}': tilt={next_step['tilt']}, "
+                            f"pan={next_step['pan']} (wait {next_step['wait_s']:.2f}s)"
+                        )
+                        self.sequence_state = 'MOVING_TO_POSE'
+                        self.sequence_step_start_time = now_s
+                    except Exception as e:
+                        self.get_logger().warn(f"Failed to publish sequence servo move: {e}")
+                        # Skip to next step on error
+                        self.sequence_step_index += 1
+                else:
+                    # No more poses or cancelled, transition to post-sequence timeout
+                    self.get_logger().info(f"Servo sequence complete for class '{self.sequence_class_name}'")
+                    self.sequence_state = 'POST_SEQUENCE_TIMEOUT'
+                    self.sequence_pose_start_time = now_s
+        
+        # State: POST_SEQUENCE_TIMEOUT - 15-second grace period to process queued frames
+        elif self.sequence_state == 'POST_SEQUENCE_TIMEOUT':
+            elapsed = now_s - self.sequence_pose_start_time
+            
+            # Exit early if object was saved
+            if self.session_saved:
+                self.get_logger().info(f"Object saved during post-sequence timeout (after {elapsed:.1f}s), completing")
+                self.sequence_state = 'COMPLETE'
+            elif elapsed >= 15.0:
+                # Timeout complete
+                if not self.session_saved:
+                    self.get_logger().info("Post-sequence timeout complete, no object found")
+                self.sequence_state = 'COMPLETE'
+            elif should_exit:
+                self.get_logger().info("Post-sequence timeout cancelled")
+                self.sequence_state = 'COMPLETE'
+        
+        # State: COMPLETE - Cleanup timer
+        elif self.sequence_state == 'COMPLETE':
+            if self.sequence_timer:
+                self.sequence_timer.cancel()
+                self.sequence_timer = None
+                self.get_logger().debug("Sequence timer stopped")
 
-        Honors action cancel requests, session completion, and overall deadline.
-        Returns True if a sequence was run, False if none configured.
+    def start_camera_sequence(self, class_name):
+        """Start non-blocking camera sequence using timer-based state machine.
+        
+        This replaces the old blocking run_camera_sequence(). Instead of blocking,
+        it initializes a timer that advances the sequence state machine at 10 Hz.
+        
+        Returns True if a sequence was started, False if none configured.
         """
         steps = self._sequence_for_class(class_name)
         if not steps:
             return False
-
-        def should_stop():
-            if self.current_goal_handle and self.current_goal_handle.is_cancel_requested:
-                return True
-            # Allow full servo sequence to complete even if object is found/saved
-            # This ensures we scan the entire configured area
-            if deadline_s is not None:
-                now_s = self.get_clock().now().nanoseconds / 1e9
-                if now_s >= deadline_s:
-                    return True
+        
+        # Initialize state machine
+        self.sequence_state = 'MOVING_TO_POSE'
+        self.sequence_steps = steps
+        self.sequence_step_index = 0
+        self.sequence_class_name = class_name
+        self.sequence_step_start_time = self.get_clock().now().nanoseconds / 1e9
+        self.sequence_pose_start_time = None
+        
+        # Send first servo command
+        first_step = steps[0]
+        try:
+            msg = StringMsg()
+            msg.data = f"{first_step['tilt']} {first_step['pan']}"
+            self.servo_move_pub.publish(msg)
+            self.get_logger().info(
+                f"Starting sequence for '{class_name}': {len(steps)} poses, "
+                f"first move tilt={first_step['tilt']}, pan={first_step['pan']} "
+                f"(wait {first_step['wait_s']:.2f}s)"
+            )
+        except Exception as e:
+            self.get_logger().warn(f"Failed to publish initial servo move: {e}")
             return False
-
-        while True:
-            for st in steps:
-                if should_stop():
-                    return True
-                try:
-                    msg = StringMsg()
-                    msg.data = f"{st['tilt']} {st['pan']}"
-                    self.servo_move_pub.publish(msg)
-                    self.get_logger().info(
-                        f"Sequence move for '{class_name}': tilt={st['tilt']}, pan={st['pan']} (wait {st['wait_s']:.2f}s)"
-                    )
-                except Exception as e:
-                    self.get_logger().warn(f"Failed to publish sequence servo move: {e}")
-                # Wait for mechanical settle
-                self.wait_for_camera_stable(max_wait_s=min(3.0, st['wait_s']))
-                # Let perception run at this pose, check periodically for stop conditions
-                remain = max(0.0, float(st['wait_s']))
-                start_wait = self.get_clock().now().nanoseconds / 1e9
-
-                while True:
-                    now = self.get_clock().now().nanoseconds / 1e9
-                    waited = now - start_wait
-
-                    if waited >= remain:
-                        break
-                    if should_stop():
-                        return True
-
-                    # Emit lightweight feedback while scanning poses
-                    try:
-                        if self.current_goal_handle:
-                            fb = DetectClosest.Feedback()
-                            fb.active_class = class_name
-                            fb.closest_px_dist = float(self.session_closest_px_dist if self.session_closest_px_dist != float('inf') else -1.0)
-                            fb.candidates = int(self.session_candidates)
-                            fb.camera_moving = bool(self.camera_is_moving)
-                            fb.depth_ready = bool(self.depth_image is not None)
-                            self.current_goal_handle.publish_feedback(fb)
-                    except Exception:
-                        pass
-
-                    # Use reusable Rate.sleep() which properly yields to executor between sleeps
-                    try:
-                        self.sequence_rate.sleep()
-                    except Exception:
-                        # Rate might raise if node is shutting down
-                        break
-            if not self.sequence_repeat:
-                break
+        
+        # Create and start timer (runs at 10 Hz)
+        self.sequence_timer = self.create_timer(
+            self.sequence_timer_period,
+            self._sequence_timer_callback,
+            callback_group=self.callback_group
+        )
+        
+        self.get_logger().info(f"Sequence timer started at {1.0/self.sequence_timer_period:.0f} Hz")
         return True
+
+    def run_camera_sequence(self, class_name, deadline_s=None):
+        """DEPRECATED: Legacy blocking implementation kept for compatibility.
+        
+        This is the old blocking version. Use start_camera_sequence() instead.
+        Kept only for backwards compatibility - will be removed in future version.
+        """
+        self.get_logger().warn("run_camera_sequence() is deprecated, this shouldn't be called")
+        return False
     
     def start_stop_callback(self, request, response):
         """Service callback to start/stop inspection"""
@@ -595,43 +689,60 @@ class DamagedObjectTrackerServer(Node):
             f"DetectClosest session started: class='{class_name}', timeout={timeout_s}s, confirm_frames={confirm_frames}, require_depth={require_depth}"
         )
 
-        # Run servo sequence - detection happens DURING the sequence
+        # Start non-blocking servo sequence using timer-based state machine
+        # The sequence runs in parallel with camera callbacks (no more blocking!)
+        ran_sequence = False
         try:
-            ran_sequence = self.run_camera_sequence(class_name, deadline_s=None)
+            ran_sequence = self.start_camera_sequence(class_name)
             if not ran_sequence:
+                # No sequence configured, try single-pose alignment
                 if self.set_camera_for_class(class_name):
                     self.wait_for_camera_stable(max_wait_s=3.0)
+                # Manually set state to POST_SEQUENCE_TIMEOUT since no sequence is running
+                self.sequence_state = 'POST_SEQUENCE_TIMEOUT'
+                self.sequence_pose_start_time = self.get_clock().now().nanoseconds / 1e9
         except Exception as e:
-            self.get_logger().warn(f"Servo sequence failed: {e}")
-
-        # Servo sequence complete - check if object was found and saved during sequence
-        self.get_logger().info(f"Servo sequence complete for class '{class_name}'")
-
-        # Part 1: Add 15-second post-sequence timeout
-        # Keep session active for 15 more seconds to process queued frames
-        if not self.session_saved:
-            self.get_logger().info("Waiting 15 seconds for queued frames to process...")
-            timeout_seconds = 15.0
-            timeout_cycles = int(timeout_seconds / 0.1)  # 0.1s per cycle at 10Hz
-            
-            for _ in range(timeout_cycles):
-                # Exit early if object was saved
-                if self.session_saved:
-                    self.get_logger().info("Object saved during post-sequence timeout, exiting early")
-                    break
-                
-                # Check for cancel request
+            self.get_logger().warn(f"Failed to start servo sequence: {e}")
+            self.sequence_state = 'COMPLETE'
+        
+        # Wait for sequence to complete (non-blocking polling at 10 Hz)
+        # The actual work happens in _sequence_timer_callback() running in parallel
+        if ran_sequence:
+            self.get_logger().info("Waiting for timer-based sequence to complete...")
+            while self.sequence_state != 'COMPLETE':
+                # Check for cancel
                 if self.current_goal_handle and self.current_goal_handle.is_cancel_requested:
+                    self.get_logger().info("Action cancelled, stopping sequence")
+                    self.sequence_state = 'COMPLETE'
+                    if self.sequence_timer:
+                        self.sequence_timer.cancel()
+                        self.sequence_timer = None
                     break
                 
-                # Yield to executor to allow camera callbacks to process
+                # Check for timeout (backup safety mechanism)
+                # This should never trigger since timer handles timing internally
+                
+                # Sleep to yield to executor - allows timer and camera callbacks to run
                 try:
                     self.sequence_rate.sleep()
                 except Exception:
                     break
             
-            if not self.session_saved:
-                self.get_logger().info("Post-sequence timeout complete, no object found")
+            self.get_logger().info(f"Sequence state machine completed for class '{class_name}'")
+        else:
+            # No sequence was started, wait for post-sequence timeout manually
+            self.get_logger().info("No sequence configured, waiting 15s for detections...")
+            timeout_cycles = int(15.0 / 0.1)
+            for _ in range(timeout_cycles):
+                if self.session_saved:
+                    self.get_logger().info("Object saved, exiting early")
+                    break
+                if self.current_goal_handle and self.current_goal_handle.is_cancel_requested:
+                    break
+                try:
+                    self.sequence_rate.sleep()
+                except Exception:
+                    break
 
         # Build result based on whether object was saved during sequence
         result = DetectClosest.Result()
