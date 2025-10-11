@@ -10,7 +10,6 @@ from cv_bridge import CvBridge
 from ultralytics import YOLO
 import cv2
 import numpy as np
-from deep_sort_realtime.deepsort_tracker import DeepSort
 import json
 import os
 from datetime import datetime
@@ -60,7 +59,15 @@ class DamagedObjectTrackerServer(Node):
         # Initialize CV bridge and YOLO model
         self.cv_bridge = CvBridge()
         self.model = YOLO('src/camera_inspection/model/damaged_object_yolo.pt')
-        
+
+        # Warmup YOLO model to avoid slow first inference
+        dummy_frame = np.zeros((640, 640, 3), dtype=np.uint8)
+        _ = self.model(dummy_frame, verbose=False)
+        self.get_logger().info('YOLO model warmed up and ready')
+
+        # Create a reusable Rate object for servo sequence timing (10 Hz = 100ms)
+        self.sequence_rate = self.create_rate(10)
+
         # Object tracking parameters (configurable via ROS params)
         # Defaults chosen for moderate sensitivity; can be overridden at runtime
         self.declare_parameter('conf_thresh', 0.5)
@@ -81,12 +88,8 @@ class DamagedObjectTrackerServer(Node):
         self.SERVO_STABLE_FRAMES = int(self.get_parameter('servo_stable_frames').value)
         self.disable_motion_gating = bool(self.get_parameter('disable_motion_gating').value)
         
-        # Initialize tracker with parameters optimized for moving camera
-        self.tracker = DeepSort(
-            max_age=12,              # Reduced from 30 - shorter track persistence
-            n_init=5,                # Increased from 3 - more confirmations needed
-            max_cosine_distance=0.15  # Reduced from 0.2 - more restrictive matching
-        )
+        # Part 2: DeepSORT removed - only save during DetectClosest sessions
+        # No background tracking/saving in normal mode
         
         # Tracking state
         self.unique_ids = set()
@@ -178,6 +181,16 @@ class DamagedObjectTrackerServer(Node):
         self.session_depth_ready = False
         self.session_result_info = None
         self.current_goal_handle = None
+        
+        # Timer-based servo sequence state machine
+        self.sequence_state = 'IDLE'  # States: IDLE, MOVING_TO_POSE, WAITING_AT_POSE, POST_SEQUENCE_TIMEOUT, COMPLETE
+        self.sequence_steps = []
+        self.sequence_step_index = 0
+        self.sequence_step_start_time = None
+        self.sequence_pose_start_time = None
+        self.sequence_timer = None
+        self.sequence_class_name = None
+        self.sequence_timer_period = 0.1  # 10 Hz timer
         
         self.get_logger().info('Damaged Object Tracker Server initialized')
 
@@ -316,78 +329,188 @@ class DamagedObjectTrackerServer(Node):
             return False
 
     def wait_for_camera_stable(self, max_wait_s=3.0):
-        """Wait briefly for servo motion to settle using existing motion gating state."""
+        """Wait briefly for servo motion to settle using existing motion gating state.
+
+        Uses non-blocking Rate.sleep() to allow camera callbacks to execute during wait.
+        """
         start = self.get_clock().now().nanoseconds / 1e9
-        import time
-        # Give a small lead time after command
-        time.sleep(0.2)
+
+        # Initial settle time - use Rate.sleep to yield to executor
+        # This allows camera/depth/servo callbacks to run
+        settle_cycles = int(0.2 / 0.1)  # 0.2s at 10Hz = 2 cycles
+        for _ in range(settle_cycles):
+            try:
+                self.sequence_rate.sleep()
+            except Exception:
+                break
+
+        # Wait for motion to stop, checking at 10 Hz
         while (self.servo_motion_detected or self.camera_is_moving):
             now = self.get_clock().now().nanoseconds / 1e9
             if now - start >= max_wait_s:
+                self.get_logger().debug(f"Camera settle timeout after {max_wait_s}s")
                 break
-            time.sleep(0.05)
+            # Yield to executor - allows callbacks to process
+            try:
+                self.sequence_rate.sleep()
+            except Exception:
+                break
 
-    def run_camera_sequence(self, class_name, deadline_s=None):
-        """Run the configured camera motion sequence for a class, if present.
+    def _sequence_timer_callback(self):
+        """Non-blocking timer callback to advance servo sequence state machine.
+        
+        This runs at 10 Hz and manages state transitions:
+        IDLE → MOVING_TO_POSE → WAITING_AT_POSE → (repeat or finish) → POST_SEQUENCE_TIMEOUT → COMPLETE
+        """
+        now_s = self.get_clock().now().nanoseconds / 1e9
+        
+        # Check for early exit conditions (cancel request or object found)
+        should_exit = False
+        if self.current_goal_handle and self.current_goal_handle.is_cancel_requested:
+            should_exit = True
+            self.get_logger().info("Sequence cancelled by client")
+        
+        # State: MOVING_TO_POSE - Waiting for camera to stabilize after servo command
+        if self.sequence_state == 'MOVING_TO_POSE':
+            # Check if camera has stabilized
+            if not self.servo_motion_detected and not self.camera_is_moving:
+                # Camera is stable, transition to waiting at pose
+                self.sequence_state = 'WAITING_AT_POSE'
+                self.sequence_pose_start_time = now_s
+                self.get_logger().info(f"Camera stabilized at pose {self.sequence_step_index + 1}/{len(self.sequence_steps)}")
+            else:
+                # Still moving, check for timeout
+                elapsed = now_s - self.sequence_step_start_time
+                if elapsed > 3.0:  # Max 3s to stabilize
+                    self.get_logger().warn(f"Camera stabilization timeout after {elapsed:.1f}s, proceeding anyway")
+                    self.sequence_state = 'WAITING_AT_POSE'
+                    self.sequence_pose_start_time = now_s
+        
+        # State: WAITING_AT_POSE - Collecting detections at current pose
+        elif self.sequence_state == 'WAITING_AT_POSE':
+            current_step = self.sequence_steps[self.sequence_step_index]
+            wait_s = current_step['wait_s']
+            elapsed = now_s - self.sequence_pose_start_time
+            
+            # Publish feedback while waiting
+            try:
+                if self.current_goal_handle:
+                    fb = DetectClosest.Feedback()
+                    fb.active_class = self.sequence_class_name
+                    fb.closest_px_dist = float(self.session_closest_px_dist if self.session_closest_px_dist != float('inf') else -1.0)
+                    fb.candidates = int(self.session_candidates)
+                    fb.camera_moving = bool(self.camera_is_moving)
+                    fb.depth_ready = bool(self.depth_image is not None)
+                    self.current_goal_handle.publish_feedback(fb)
+            except Exception:
+                pass
+            
+            # Check if we should move to next pose
+            if should_exit or elapsed >= wait_s:
+                self.sequence_step_index += 1
+                
+                # Check if more poses remain
+                if self.sequence_step_index < len(self.sequence_steps) and not should_exit:
+                    # Move to next pose
+                    next_step = self.sequence_steps[self.sequence_step_index]
+                    try:
+                        msg = StringMsg()
+                        msg.data = f"{next_step['tilt']} {next_step['pan']}"
+                        self.servo_move_pub.publish(msg)
+                        self.get_logger().info(
+                            f"Sequence move {self.sequence_step_index + 1}/{len(self.sequence_steps)} "
+                            f"for '{self.sequence_class_name}': tilt={next_step['tilt']}, "
+                            f"pan={next_step['pan']} (wait {next_step['wait_s']:.2f}s)"
+                        )
+                        self.sequence_state = 'MOVING_TO_POSE'
+                        self.sequence_step_start_time = now_s
+                    except Exception as e:
+                        self.get_logger().warn(f"Failed to publish sequence servo move: {e}")
+                        # Skip to next step on error
+                        self.sequence_step_index += 1
+                else:
+                    # No more poses or cancelled, transition to post-sequence timeout
+                    self.get_logger().info(f"Servo sequence complete for class '{self.sequence_class_name}'")
+                    self.sequence_state = 'POST_SEQUENCE_TIMEOUT'
+                    self.sequence_pose_start_time = now_s
+        
+        # State: POST_SEQUENCE_TIMEOUT - 15-second grace period to process queued frames
+        elif self.sequence_state == 'POST_SEQUENCE_TIMEOUT':
+            elapsed = now_s - self.sequence_pose_start_time
+            
+            # Exit early if object was saved
+            if self.session_saved:
+                self.get_logger().info(f"Object saved during post-sequence timeout (after {elapsed:.1f}s), completing")
+                self.sequence_state = 'COMPLETE'
+            elif elapsed >= 15.0:
+                # Timeout complete
+                if not self.session_saved:
+                    self.get_logger().info("Post-sequence timeout complete, no object found")
+                self.sequence_state = 'COMPLETE'
+            elif should_exit:
+                self.get_logger().info("Post-sequence timeout cancelled")
+                self.sequence_state = 'COMPLETE'
+        
+        # State: COMPLETE - Cleanup timer
+        elif self.sequence_state == 'COMPLETE':
+            if self.sequence_timer:
+                self.sequence_timer.cancel()
+                self.sequence_timer = None
+                self.get_logger().debug("Sequence timer stopped")
 
-        Honors action cancel requests, session completion, and overall deadline.
-        Returns True if a sequence was run, False if none configured.
+    def start_camera_sequence(self, class_name):
+        """Start non-blocking camera sequence using timer-based state machine.
+        
+        This replaces the old blocking run_camera_sequence(). Instead of blocking,
+        it initializes a timer that advances the sequence state machine at 10 Hz.
+        
+        Returns True if a sequence was started, False if none configured.
         """
         steps = self._sequence_for_class(class_name)
         if not steps:
             return False
-
-        def should_stop():
-            if self.current_goal_handle and self.current_goal_handle.is_cancel_requested:
-                return True
-            if self.session_saved:
-                return True
-            if deadline_s is not None:
-                now_s = self.get_clock().now().nanoseconds / 1e9
-                if now_s >= deadline_s:
-                    return True
+        
+        # Initialize state machine
+        self.sequence_state = 'MOVING_TO_POSE'
+        self.sequence_steps = steps
+        self.sequence_step_index = 0
+        self.sequence_class_name = class_name
+        self.sequence_step_start_time = self.get_clock().now().nanoseconds / 1e9
+        self.sequence_pose_start_time = None
+        
+        # Send first servo command
+        first_step = steps[0]
+        try:
+            msg = StringMsg()
+            msg.data = f"{first_step['tilt']} {first_step['pan']}"
+            self.servo_move_pub.publish(msg)
+            self.get_logger().info(
+                f"Starting sequence for '{class_name}': {len(steps)} poses, "
+                f"first move tilt={first_step['tilt']}, pan={first_step['pan']} "
+                f"(wait {first_step['wait_s']:.2f}s)"
+            )
+        except Exception as e:
+            self.get_logger().warn(f"Failed to publish initial servo move: {e}")
             return False
-
-        import time
-        while True:
-            for st in steps:
-                if should_stop():
-                    return True
-                try:
-                    msg = StringMsg()
-                    msg.data = f"{st['tilt']} {st['pan']}"
-                    self.servo_move_pub.publish(msg)
-                    self.get_logger().info(
-                        f"Sequence move for '{class_name}': tilt={st['tilt']}, pan={st['pan']} (wait {st['wait_s']:.2f}s)"
-                    )
-                except Exception as e:
-                    self.get_logger().warn(f"Failed to publish sequence servo move: {e}")
-                # Wait for mechanical settle
-                self.wait_for_camera_stable(max_wait_s=min(3.0, st['wait_s']))
-                # Let perception run at this pose, check periodically for stop conditions
-                remain = max(0.0, float(st['wait_s']))
-                slice_s = 0.1
-                waited = 0.0
-                while waited < remain:
-                    if should_stop():
-                        return True
-                    # Emit lightweight feedback while scanning poses
-                    try:
-                        if self.current_goal_handle:
-                            fb = DetectClosest.Feedback()
-                            fb.active_class = class_name
-                            fb.closest_px_dist = float(self.session_closest_px_dist if self.session_closest_px_dist != float('inf') else -1.0)
-                            fb.candidates = int(self.session_candidates)
-                            fb.camera_moving = bool(self.camera_is_moving)
-                            fb.depth_ready = bool(self.depth_image is not None)
-                            self.current_goal_handle.publish_feedback(fb)
-                    except Exception:
-                        pass
-                    time.sleep(min(slice_s, remain - waited))
-                    waited += slice_s
-            if not self.sequence_repeat:
-                break
+        
+        # Create and start timer (runs at 10 Hz)
+        self.sequence_timer = self.create_timer(
+            self.sequence_timer_period,
+            self._sequence_timer_callback,
+            callback_group=self.callback_group
+        )
+        
+        self.get_logger().info(f"Sequence timer started at {1.0/self.sequence_timer_period:.0f} Hz")
         return True
+
+    def run_camera_sequence(self, class_name, deadline_s=None):
+        """DEPRECATED: Legacy blocking implementation kept for compatibility.
+        
+        This is the old blocking version. Use start_camera_sequence() instead.
+        Kept only for backwards compatibility - will be removed in future version.
+        """
+        self.get_logger().warn("run_camera_sequence() is deprecated, this shouldn't be called")
+        return False
     
     def start_stop_callback(self, request, response):
         """Service callback to start/stop inspection"""
@@ -447,11 +570,6 @@ class DamagedObjectTrackerServer(Node):
         self.frames_since_servo_stopped = 0
         self.camera_is_moving = False
         self.previous_servo_angles = {}
-        self.tracker = DeepSort(
-            max_age=12,              # Optimized for moving camera
-            n_init=5,                # More confirmations needed
-            max_cosine_distance=0.15  # More restrictive matching
-        )
         
         # Create subscriptions
         self.robot_odom_sub = self.create_subscription(
@@ -544,7 +662,7 @@ class DamagedObjectTrackerServer(Node):
         # Extract parameters with defaults
         class_name = goal.class_name
         timeout_s = goal.timeout_s if goal.timeout_s > 0.0 else 20.0
-        confirm_frames = goal.confirm_frames if goal.confirm_frames > 0 else 3
+        confirm_frames = goal.confirm_frames if goal.confirm_frames > 0 else 1  # Default 1 for fast response with direct YOLO
         require_depth = bool(goal.require_depth)
 
         # Ensure inspection is active
@@ -552,32 +670,86 @@ class DamagedObjectTrackerServer(Node):
             self._start_inspection()
             self.session_started_inspection = True
 
+            # Wait for camera subscription to warm up and first frames to arrive
+            # This ensures camera callbacks are active before servo sequence starts
+            import time
+            warmup_time = 1.0  # seconds
+            self.get_logger().info(f"Waiting {warmup_time}s for camera warm-up...")
+            time.sleep(warmup_time)
+            self.get_logger().info("Camera warm-up complete")
+
         # Activate session
         self.session_active = True
         self.session_target_class = class_name
         self.session_require_depth = require_depth
         self.session_confirm_frames = confirm_frames
-        self.session_deadline = self.get_clock().now().nanoseconds / 1e9 + timeout_s
         self.session_saved = False
         self.session_result_info = None
         self.get_logger().info(
             f"DetectClosest session started: class='{class_name}', timeout={timeout_s}s, confirm_frames={confirm_frames}, require_depth={require_depth}"
         )
 
-        # Pre-scan: either run a per-class sequence or a single alignment
+        # Start non-blocking servo sequence using timer-based state machine
+        # The sequence runs in parallel with camera callbacks (no more blocking!)
+        ran_sequence = False
         try:
-            # Compute deadline for pre-scan as session deadline to avoid overruns
-            ran_sequence = self.run_camera_sequence(class_name, deadline_s=self.session_deadline)
+            ran_sequence = self.start_camera_sequence(class_name)
             if not ran_sequence:
+                # No sequence configured, try single-pose alignment
                 if self.set_camera_for_class(class_name):
                     self.wait_for_camera_stable(max_wait_s=3.0)
+                # Manually set state to POST_SEQUENCE_TIMEOUT since no sequence is running
+                self.sequence_state = 'POST_SEQUENCE_TIMEOUT'
+                self.sequence_pose_start_time = self.get_clock().now().nanoseconds / 1e9
         except Exception as e:
-            self.get_logger().warn(f"Pre-scan alignment/sequence failed: {e}")
+            self.get_logger().warn(f"Failed to start servo sequence: {e}")
+            self.sequence_state = 'COMPLETE'
+        
+        # Wait for sequence to complete (non-blocking polling at 10 Hz)
+        # The actual work happens in _sequence_timer_callback() running in parallel
+        if ran_sequence:
+            self.get_logger().info("Waiting for timer-based sequence to complete...")
+            while self.sequence_state != 'COMPLETE':
+                # Check for cancel
+                if self.current_goal_handle and self.current_goal_handle.is_cancel_requested:
+                    self.get_logger().info("Action cancelled, stopping sequence")
+                    self.sequence_state = 'COMPLETE'
+                    if self.sequence_timer:
+                        self.sequence_timer.cancel()
+                        self.sequence_timer = None
+                    break
+                
+                # Check for timeout (backup safety mechanism)
+                # This should never trigger since timer handles timing internally
+                
+                # Sleep to yield to executor - allows timer and camera callbacks to run
+                try:
+                    self.sequence_rate.sleep()
+                except Exception:
+                    break
+            
+            self.get_logger().info(f"Sequence state machine completed for class '{class_name}'")
+        else:
+            # No sequence was started, wait for post-sequence timeout manually
+            self.get_logger().info("No sequence configured, waiting 15s for detections...")
+            timeout_cycles = int(15.0 / 0.1)
+            for _ in range(timeout_cycles):
+                if self.session_saved:
+                    self.get_logger().info("Object saved, exiting early")
+                    break
+                if self.current_goal_handle and self.current_goal_handle.is_cancel_requested:
+                    break
+                try:
+                    self.sequence_rate.sleep()
+                except Exception:
+                    break
 
-        # If object already saved during pre-scan, short-circuit and return
+        # Build result based on whether object was saved during sequence
+        result = DetectClosest.Result()
+
         if self.session_saved and self.session_result_info is not None:
+            # Success: object was found and saved during servo sequence
             info = self.session_result_info
-            result = DetectClosest.Result()
             result.success = True
             result.reason = 'saved'
             result.saved_id = int(info.get('id', -1))
@@ -597,90 +769,37 @@ class DamagedObjectTrackerServer(Node):
             result.timestamp = float(info.get('timestamp', 0.0))
 
             goal_handle.succeed()
-            if self.session_started_inspection:
-                self._stop_inspection()
-            self._clear_session()
-            self.get_logger().info('DetectClosest session completed during pre-scan')
-            return result
+            self.get_logger().info(f'DetectClosest session completed: found object ID {result.saved_id}')
+        else:
+            # Not found: no object detected during servo sequence
+            result.success = False
+            result.reason = 'not_found'
+            result.saved_id = -1
+            result.bbox_x1 = result.bbox_y1 = result.bbox_x2 = result.bbox_y2 = 0
+            result.world_x = result.world_y = result.world_z = 0.0
+            result.image_file = ''
+            result.timestamp = 0.0
 
-        # Feedback loop until saved/timeout/cancel
-        rate_hz = 5.0
-        period = 1.0 / rate_hz
-        import time
-        while rclpy.ok():
-            # Handle cancel
-            if goal_handle.is_cancel_requested:
-                self.get_logger().info('DetectClosest canceled by client')
-                goal_handle.canceled()
-                if self.session_started_inspection:
+            goal_handle.succeed()  # Action succeeded (completed normally), but object not found
+            self.get_logger().info(f'DetectClosest session completed: no object of class \'{class_name}\' found')
+
+        # Cleanup - clear session state but keep inspection running to avoid destroying subscriptions mid-execution
+        # Only stop inspection if we started it for this session AND we're in a safe state
+        self._clear_session()
+
+        # Stop inspection AFTER returning to avoid destroying handles while executor is using them
+        if self.session_started_inspection:
+            # Schedule inspection stop for next iteration to avoid InvalidHandle errors
+            def delayed_stop():
+                import time
+                time.sleep(0.1)  # Small delay to let executor finish current iteration
+                if self.inspection_active:
                     self._stop_inspection()
-                self._clear_session()
-                result = DetectClosest.Result()
-                result.success = False
-                result.reason = 'canceled'
-                result.saved_id = -1
-                result.bbox_x1 = result.bbox_y1 = result.bbox_x2 = result.bbox_y2 = 0
-                result.world_x = result.world_y = result.world_z = 0.0
-                result.image_file = ''
-                result.timestamp = 0.0
-                return result
 
-            # Publish feedback
-            fb = DetectClosest.Feedback()
-            fb.active_class = class_name
-            fb.closest_px_dist = float(self.session_closest_px_dist if self.session_closest_px_dist != float('inf') else -1.0)
-            fb.candidates = int(self.session_candidates)
-            fb.camera_moving = bool(self.camera_is_moving)
-            fb.depth_ready = bool(self.depth_image is not None)
-            goal_handle.publish_feedback(fb)
+            import threading
+            threading.Thread(target=delayed_stop, daemon=True).start()
 
-            # Check success
-            if self.session_saved and self.session_result_info is not None:
-                info = self.session_result_info
-                result = DetectClosest.Result()
-                result.success = True
-                result.reason = 'saved'
-                result.saved_id = int(info.get('id', -1))
-                x1, y1, x2, y2 = info.get('bbox', (0, 0, 0, 0))
-                result.bbox_x1 = int(x1)
-                result.bbox_y1 = int(y1)
-                result.bbox_x2 = int(x2)
-                result.bbox_y2 = int(y2)
-                pos = info.get('world_position')
-                if pos:
-                    result.world_x = float(pos[0])
-                    result.world_y = float(pos[1])
-                    result.world_z = float(pos[2])
-                else:
-                    result.world_x = result.world_y = result.world_z = 0.0
-                result.image_file = info.get('image_file', '')
-                result.timestamp = float(info.get('timestamp', 0.0))
-
-                goal_handle.succeed()
-                if self.session_started_inspection:
-                    self._stop_inspection()
-                self._clear_session()
-                self.get_logger().info('DetectClosest session completed successfully')
-                return result
-
-            # Check timeout
-            now_s = self.get_clock().now().nanoseconds / 1e9
-            if now_s >= self.session_deadline:
-                self.get_logger().info('DetectClosest session timed out')
-                if self.session_started_inspection:
-                    self._stop_inspection()
-                self._clear_session()
-                result = DetectClosest.Result()
-                result.success = False
-                result.reason = 'timeout'
-                result.saved_id = -1
-                result.bbox_x1 = result.bbox_y1 = result.bbox_x2 = result.bbox_y2 = 0
-                result.world_x = result.world_y = result.world_z = 0.0
-                result.image_file = ''
-                result.timestamp = 0.0
-                return result
-
-            time.sleep(period)
+        return result
     
     def _init_saved_positions_from_data(self):
         """Initialize the saved positions dictionary from loaded object data"""
@@ -940,7 +1059,11 @@ class DamagedObjectTrackerServer(Node):
         """Process camera images and track damaged objects"""
         if not self.inspection_active:
             return
-            
+
+        # Log callback execution during active session for debugging
+        if self.session_active:
+            self.get_logger().info(f"Camera callback executing during session (target: {self.session_target_class})")
+
         try:
             frame = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
             self.color_image_shape = frame.shape[:2]  # Store color image shape (height, width)
@@ -949,6 +1072,8 @@ class DamagedObjectTrackerServer(Node):
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             if self.last_gray is None:
                 self.last_gray = gray
+                if self.session_active:
+                    self.get_logger().info("First frame - initializing motion detection (skipping YOLO)")
                 return
                 
             # Frame difference motion detection
@@ -960,100 +1085,141 @@ class DamagedObjectTrackerServer(Node):
             self.camera_is_moving = frame_motion_detected or self.servo_motion_detected
             
             self.last_gray = gray
-            
-            if self.camera_is_moving and not self.disable_motion_gating:
+
+            # Skip detection if camera is moving, UNLESS:
+            # 1. Motion gating is disabled globally, OR
+            # 2. We have an active session (must detect during servo sequence)
+            skip_detection = self.camera_is_moving and not self.disable_motion_gating and not self.session_active
+
+            if skip_detection:
                 motion_reason = []
                 if frame_motion_detected:
                     motion_reason.append(f"frame_motion({moving_pixels}px)")
                 if self.servo_motion_detected:
                     motion_reason.append("servo_motion")
-                
-                self.get_logger().debug(f"Camera moving - {', '.join(motion_reason)} - skipping detection")
+
+                log_msg = f"Camera moving - {', '.join(motion_reason)} - skipping detection"
+                if self.session_active:
+                    self.get_logger().warn(log_msg + f" (session active for '{self.session_target_class}')")
+                else:
+                    self.get_logger().debug(log_msg)
                 return
+
+            # Log motion state during active session
+            if self.session_active:
+                if self.camera_is_moving:
+                    motion_parts = []
+                    if frame_motion_detected:
+                        motion_parts.append(f"frame({moving_pixels}px)")
+                    if self.servo_motion_detected:
+                        motion_parts.append("servo")
+                    self.get_logger().info(f"Camera MOVING ({', '.join(motion_parts)}) - detecting anyway (session active)")
             
             # Run YOLO detection
             results = self.model(frame)[0]
             xyxy = results.boxes.xyxy.cpu().numpy()
             scores = results.boxes.conf.cpu().numpy()
             classes = results.boxes.cls.cpu().numpy()
-            
-            # Convert to DeepSORT format
-            raw_dets = []
-            for (x1, y1, x2, y2), conf, cls in zip(xyxy, scores, classes):
-                if conf < self.CONF_THRESH:
-                    continue
-                w = x2 - x1
-                h = y2 - y1
-                bbox_xywh = [float(x1), float(y1), float(w), float(h)]
-                raw_dets.append((bbox_xywh, float(conf), int(cls)))
-            
-            # Update tracker
-            tracks = self.tracker.update_tracks(raw_dets, frame=frame)
-            
-            # Process tracks
-            detected_objects = []
-            for t in tracks:
-                if not t.is_confirmed():
-                    continue
 
-                tid = t.track_id
-                self.unique_ids.add(tid)
-
-                x1, y1, x2, y2 = map(int, t.to_ltrb())
-                cls_id = t.det_class
-                class_name = self.model.names.get(cls_id, str(cls_id))
-
-                object_position = self.get_3d_position((x1, y1, x2, y2), self.depth_image)
-                
-                is_duplicate = False
-                if object_position:
-                    is_duplicate = self.is_close_to_existing_object(class_name, object_position)
-
-                is_new_object = tid not in self.saved_ids and not is_duplicate
-
-                object_data = {
-                    'id': tid,
-                    'class_id': cls_id,
-                    'class_name': class_name,
-                    'bbox': (x1, y1, x2, y2),
-                    'object_position': object_position,
-                    'robot_position': self.robot_position,
-                    'timestamp': msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9,
-                    'is_new': is_new_object,
-                    'is_duplicate': is_duplicate
-                }
-                detected_objects.append(object_data)
-                
-                # Draw visualization
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                
-                if is_duplicate:
-                    color = (0, 165, 255)
-                    status = "DUPLICATE"
-                elif is_new_object:
-                    color = (0, 0, 255)
-                    status = "NEW"
+            # Log raw detections during active session
+            if self.session_active:
+                if len(xyxy) > 0:
+                    detected_class_names = [self.model.names.get(int(cls), str(cls)) for cls in classes]
+                    self.get_logger().info(f"YOLO detected {len(xyxy)} objects: {detected_class_names} (scores: {[f'{s:.2f}' for s in scores]})")
                 else:
-                    color = (0, 255, 0)
-                    status = "KNOWN"
-                    
-                text = f"{class_name} ID:{tid} ({status})"
-                
-                if object_position:
-                    x, y, z = object_position
-                    text += f" | Pos: ({x:.2f}, {y:.2f}, {z:.2f})"
-                    
-                cv2.putText(frame, text, (x1, y1-10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                    self.get_logger().info(f"YOLO detected 0 objects (target: '{self.session_target_class}')")
             
-            # Update detection count
-            self.detection_count += len(detected_objects)
+            # DETECTION PROCESSING: Two different paths depending on mode
+            detected_objects = []
+
+            if self.session_active:
+                # ===== SESSION MODE: Process YOLO detections directly (skip DeepSORT) =====
+                # During DetectClosest, we don't need multi-frame tracking confirmation
+                # Process detections immediately for faster response
+                raw_count = len(xyxy)
+                filtered_count = sum(1 for conf in scores if conf >= self.CONF_THRESH)
+                self.get_logger().info(
+                    f"Session mode: YOLO raw={raw_count}, after conf_thresh>={self.CONF_THRESH}: {filtered_count} "
+                    f"(skipping DeepSORT)"
+                )
+
+                for (x1, y1, x2, y2), conf, cls in zip(xyxy, scores, classes):
+                    if conf < self.CONF_THRESH:
+                        continue
+
+                    cls_id = int(cls)
+                    class_name = self.model.names.get(cls_id, str(cls_id))
+
+                    # Use a temporary ID based on bbox (for tracking within same session)
+                    temp_id = hash((int(x1), int(y1), int(x2), int(y2), cls_id)) % 100000
+
+                    x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                    object_position = self.get_3d_position((x1, y1, x2, y2), self.depth_image)
+
+                    is_duplicate = False
+                    if object_position:
+                        is_duplicate = self.is_close_to_existing_object(class_name, object_position)
+
+                    is_new_object = temp_id not in self.saved_ids and not is_duplicate
+
+                    object_data = {
+                        'id': temp_id,
+                        'class_id': cls_id,
+                        'class_name': class_name,
+                        'bbox': (x1, y1, x2, y2),
+                        'object_position': object_position,
+                        'robot_position': self.robot_position,
+                        'timestamp': msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9,
+                        'is_new': is_new_object,
+                        'is_duplicate': is_duplicate,
+                        'confidence': float(conf)
+                    }
+                    detected_objects.append(object_data)
+
+                    # Draw visualization for session mode
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 255), 2)  # Magenta for session mode
+                    text = f"{class_name} conf:{conf:.2f}"
+                    if object_position:
+                        x, y, z = object_position
+                        text += f" | ({x:.2f}, {y:.2f}, {z:.2f})"
+                    cv2.putText(frame, text, (x1, y1-10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 255), 2)
+
+            else:
+                # ===== NORMAL MODE: Just run YOLO for visualization, don't save anything =====
+                # Part 2: Removed DeepSORT tracking and automatic saving
+                # Server only saves when client explicitly triggers DetectClosest action
+                for (x1, y1, x2, y2), conf, cls in zip(xyxy, scores, classes):
+                    if conf < self.CONF_THRESH:
+                        continue
+
+                    cls_id = int(cls)
+                    class_name = self.model.names.get(cls_id, str(cls_id))
+                    x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+
+                    # Draw visualization only - no tracking, no saving
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green for detections
+                    text = f"{class_name} conf:{conf:.2f}"
+                    cv2.putText(frame, text, (x1, y1-10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            
+            # Update detection count (for session mode only)
+            if self.session_active:
+                self.detection_count += len(detected_objects)
 
             # Action session path: select closest candidate of target class and save once
             if self.session_active and self.session_target_class is not None:
                 candidates = [o for o in detected_objects if o['class_name'] == self.session_target_class]
                 self.session_candidates = len(candidates)
                 self.session_depth_ready = self.depth_image is not None
+
+                # Log all detected objects during session for debugging
+                if detected_objects:
+                    detected_classes = [o['class_name'] for o in detected_objects]
+                    self.get_logger().info(
+                        f"Session active, detected classes: {detected_classes}, "
+                        f"target='{self.session_target_class}', candidates={len(candidates)}"
+                    )
 
                 if candidates:
                     h, w = frame.shape[:2]
@@ -1101,16 +1267,8 @@ class DamagedObjectTrackerServer(Node):
                                 'timestamp': best['timestamp'],
                             }
                             self.session_saved = True
-            else:
-                # Original behavior: save all new objects
-                if detected_objects:
-                    new_objects_count = sum(1 for obj in detected_objects if obj['is_new'])
-                    duplicate_count = sum(1 for obj in detected_objects if obj['is_duplicate'])
-                    self.get_logger().info(
-                        f"Tracking {len(detected_objects)} objects, {new_objects_count} new, "
-                        f"{duplicate_count} duplicates, {len(self.unique_ids)} unique IDs total"
-                    )
-                    self.save_damaged_object_poses(detected_objects, frame)
+            # Part 2: Removed automatic save logic in normal mode
+            # Only save when session_active==True (client explicitly requested)
             
             # Add status overlay
             cv2.putText(frame, f"INSPECTION: {'ACTIVE' if self.inspection_active else 'INACTIVE'}", 

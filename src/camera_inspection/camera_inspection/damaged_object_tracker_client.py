@@ -123,8 +123,8 @@ class DetectClosestClient(Node):
 def parse_args(argv):
     parser = argparse.ArgumentParser(description='DetectClosest action client')
     parser.add_argument('--class', dest='class_name', required=True, help='Target class name (e.g., crack)')
-    parser.add_argument('--timeout', type=float, default=20.0, help='Timeout seconds')
-    parser.add_argument('--confirm', type=int, default=3, help='Confirm frames')
+    parser.add_argument('--timeout', type=float, default=20.0, help='Timeout seconds (default: 20)')
+    parser.add_argument('--confirm', type=int, default=1, help='Confirm frames (default: 1)')
     parser.add_argument('--require-depth', action='store_true', help='Require depth measurement')
     parser.add_argument('--cancel-after', type=float, default=None, help='Cancel after N seconds (for testing)')
     parser.add_argument('--log-file', type=str,

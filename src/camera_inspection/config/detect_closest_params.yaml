@@ -15,7 +15,7 @@ damaged_object_tracker_server:
     # --- Detection/motion gating tuning ---
     # Set true to allow detections even while camera is moving
     disable_motion_gating: false
-    # YOLO confidence threshold
+    # YOLO confidence threshold (lowered for DetectClosest to catch moderate-confidence detections)
     conf_thresh: 0.5
     # Frame-diff motion detection: number of pixels above diff threshold to consider motion
     frame_stationary_thresh: 3000
@@ -55,19 +55,13 @@ damaged_object_tracker_server:
       ]
     group_b_sequence_json: |
       [
-        {"tilt": 2000, "pan": 2000, "wait_s": 3.0},
-        {"tilt": 1800, "pan": 2000, "wait_s": 3.0},
-        {"tilt": 1500, "pan": 2000, "wait_s": 3.0},
-        {"tilt": 1300, "pan": 2000, "wait_s": 3.0},
-        {"tilt": 2000, "pan": 1350, "wait_s": 3.0},
-        {"tilt": 1800, "pan": 1350, "wait_s": 3.0},
-        {"tilt": 1500, "pan": 1350, "wait_s": 3.0},
-        {"tilt": 1300, "pan": 1350, "wait_s": 3.0},
-        {"tilt": 2000, "pan": 2350, "wait_s": 3.0},
-        {"tilt": 1800, "pan": 2350, "wait_s": 3.0},
-        {"tilt": 1500, "pan": 2350, "wait_s": 3.0},
-        {"tilt": 1300, "pan": 2350, "wait_s": 3.0},
-        {"tilt": 2000, "pan": 2350, "wait_s": 2.0}
+        {"tilt": 2000, "pan": 2000, "wait_s": 1.0},
+        {"tilt": 1650, "pan": 2000, "wait_s": 1.0},
+        {"tilt": 2000, "pan": 1650, "wait_s": 1.0},
+        {"tilt": 1650, "pan": 1650, "wait_s": 1.0},
+        {"tilt": 2000, "pan": 2350, "wait_s": 1.0},
+        {"tilt": 1650, "pan": 2350, "wait_s": 1.0},
+        {"tilt": 2000, "pan": 2000, "wait_s": 1.0}
       ]
     # Set to true to continuously loop through the sequences until success/timeout/cancel
     camera_sequence_repeat: false

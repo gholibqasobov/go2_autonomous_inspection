@@ -1,14 +1,14 @@
 [
   {
-    "id": "1",
-    "class_name": "light_on",
-    "image_file": "object_1_20250719_130925.jpg",
-    "timestamp": 1752912548.1067567,
+    "id": 67984,
+    "class_name": "light_off",
+    "image_file": "object_67984_20251011_153352.jpg",
+    "timestamp": 1760178793.628023,
     "bbox": {
-      "x1": 410,
-      "y1": 0,
-      "x2": 768,
-      "y2": 258
+      "x1": 543,
+      "y1": 622,
+      "x2": 766,
+      "y2": 719
     },
     "robot_position": {
       "x": 0,
@@ -16,22 +16,22 @@
       "z": 0
     },
     "world_position": {
-      "x": 0.3995844788038237,
-      "y": -1.6220710233725495,
-      "z": 2.911005825988888
+      "x": 1.1415277996824764,
+      "y": -0.315819100135283,
+      "z": -0.6033169917791797
     },
     "transformation_success": true
   },
   {
-    "id": "3",
-    "class_name": "half_working_light",
-    "image_file": "object_3_20250719_130927.jpg",
-    "timestamp": 1752912548.3072023,
+    "id": 68754,
+    "class_name": "light_off",
+    "image_file": "object_68754_20251011_153731.jpg",
+    "timestamp": 1760179011.7599585,
     "bbox": {
-      "x1": 640,
-      "y1": 146,
-      "x2": 930,
-      "y2": 417
+      "x1": 546,
+      "y1": 622,
+      "x2": 763,
+      "y2": 719
     },
     "robot_position": {
       "x": 0,
@@ -39,9 +39,32 @@
       "z": 0
     },
     "world_position": {
-      "x": -0.19754258893334398,
-      "y": -2.8481720476114134,
-      "z": 2.494643575180136
+      "x": 0.46324323561058234,
+      "y": -0.1281625045443358,
+      "z": -0.2448319834596848
+    },
+    "transformation_success": true
+  },
+  {
+    "id": 15231,
+    "class_name": "fire_extinguisher",
+    "image_file": "object_15231_20251011_154954.jpg",
+    "timestamp": 1760179754.7847,
+    "bbox": {
+      "x1": 0,
+      "y1": 15,
+      "x2": 832,
+      "y2": 637
+    },
+    "robot_position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "world_position": {
+      "x": 0.697052738351169,
+      "y": 0.0700448723705096,
+      "z": 0.04357870444974829
     },
     "transformation_success": true
   }
