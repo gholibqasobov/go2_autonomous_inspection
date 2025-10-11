@@ -10,7 +10,6 @@ from cv_bridge import CvBridge
 from ultralytics import YOLO
 import cv2
 import numpy as np
-from deep_sort_realtime.deepsort_tracker import DeepSort
 import json
 import os
 from datetime import datetime
@@ -89,12 +88,8 @@ class DamagedObjectTrackerServer(Node):
         self.SERVO_STABLE_FRAMES = int(self.get_parameter('servo_stable_frames').value)
         self.disable_motion_gating = bool(self.get_parameter('disable_motion_gating').value)
         
-        # Initialize tracker with parameters optimized for moving camera
-        self.tracker = DeepSort(
-            max_age=12,              # Reduced from 30 - shorter track persistence
-            n_init=5,                # Increased from 3 - more confirmations needed
-            max_cosine_distance=0.15  # Reduced from 0.2 - more restrictive matching
-        )
+        # Part 2: DeepSORT removed - only save during DetectClosest sessions
+        # No background tracking/saving in normal mode
         
         # Tracking state
         self.unique_ids = set()
@@ -324,16 +319,32 @@ class DamagedObjectTrackerServer(Node):
             return False
 
     def wait_for_camera_stable(self, max_wait_s=3.0):
-        """Wait briefly for servo motion to settle using existing motion gating state."""
-        import time
+        """Wait briefly for servo motion to settle using existing motion gating state.
+
+        Uses non-blocking Rate.sleep() to allow camera callbacks to execute during wait.
+        """
         start = self.get_clock().now().nanoseconds / 1e9
-        # Give a small lead time after command
-        time.sleep(0.2)
+
+        # Initial settle time - use Rate.sleep to yield to executor
+        # This allows camera/depth/servo callbacks to run
+        settle_cycles = int(0.2 / 0.1)  # 0.2s at 10Hz = 2 cycles
+        for _ in range(settle_cycles):
+            try:
+                self.sequence_rate.sleep()
+            except Exception:
+                break
+
+        # Wait for motion to stop, checking at 10 Hz
         while (self.servo_motion_detected or self.camera_is_moving):
             now = self.get_clock().now().nanoseconds / 1e9
             if now - start >= max_wait_s:
+                self.get_logger().debug(f"Camera settle timeout after {max_wait_s}s")
                 break
-            time.sleep(0.01)  # 10ms minimal delay
+            # Yield to executor - allows callbacks to process
+            try:
+                self.sequence_rate.sleep()
+            except Exception:
+                break
 
     def run_camera_sequence(self, class_name, deadline_s=None):
         """Run the configured camera motion sequence for a class, if present.
@@ -465,11 +476,6 @@ class DamagedObjectTrackerServer(Node):
         self.frames_since_servo_stopped = 0
         self.camera_is_moving = False
         self.previous_servo_angles = {}
-        self.tracker = DeepSort(
-            max_age=12,              # Optimized for moving camera
-            n_init=5,                # More confirmations needed
-            max_cosine_distance=0.15  # More restrictive matching
-        )
         
         # Create subscriptions
         self.robot_odom_sub = self.create_subscription(
@@ -562,13 +568,21 @@ class DamagedObjectTrackerServer(Node):
         # Extract parameters with defaults
         class_name = goal.class_name
         timeout_s = goal.timeout_s if goal.timeout_s > 0.0 else 20.0
-        confirm_frames = goal.confirm_frames if goal.confirm_frames > 0 else 3
+        confirm_frames = goal.confirm_frames if goal.confirm_frames > 0 else 1  # Default 1 for fast response with direct YOLO
         require_depth = bool(goal.require_depth)
 
         # Ensure inspection is active
         if not self.inspection_active:
             self._start_inspection()
             self.session_started_inspection = True
+
+            # Wait for camera subscription to warm up and first frames to arrive
+            # This ensures camera callbacks are active before servo sequence starts
+            import time
+            warmup_time = 1.0  # seconds
+            self.get_logger().info(f"Waiting {warmup_time}s for camera warm-up...")
+            time.sleep(warmup_time)
+            self.get_logger().info("Camera warm-up complete")
 
         # Activate session
         self.session_active = True
@@ -592,6 +606,32 @@ class DamagedObjectTrackerServer(Node):
 
         # Servo sequence complete - check if object was found and saved during sequence
         self.get_logger().info(f"Servo sequence complete for class '{class_name}'")
+
+        # Part 1: Add 15-second post-sequence timeout
+        # Keep session active for 15 more seconds to process queued frames
+        if not self.session_saved:
+            self.get_logger().info("Waiting 15 seconds for queued frames to process...")
+            timeout_seconds = 15.0
+            timeout_cycles = int(timeout_seconds / 0.1)  # 0.1s per cycle at 10Hz
+            
+            for _ in range(timeout_cycles):
+                # Exit early if object was saved
+                if self.session_saved:
+                    self.get_logger().info("Object saved during post-sequence timeout, exiting early")
+                    break
+                
+                # Check for cancel request
+                if self.current_goal_handle and self.current_goal_handle.is_cancel_requested:
+                    break
+                
+                # Yield to executor to allow camera callbacks to process
+                try:
+                    self.sequence_rate.sleep()
+                except Exception:
+                    break
+            
+            if not self.session_saved:
+                self.get_logger().info("Post-sequence timeout complete, no object found")
 
         # Build result based on whether object was saved during sequence
         result = DetectClosest.Result()
@@ -911,7 +951,7 @@ class DamagedObjectTrackerServer(Node):
 
         # Log callback execution during active session for debugging
         if self.session_active:
-            self.get_logger().debug(f"Camera callback executing during session (target: {self.session_target_class})")
+            self.get_logger().info(f"Camera callback executing during session (target: {self.session_target_class})")
 
         try:
             frame = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
@@ -921,6 +961,8 @@ class DamagedObjectTrackerServer(Node):
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             if self.last_gray is None:
                 self.last_gray = gray
+                if self.session_active:
+                    self.get_logger().info("First frame - initializing motion detection (skipping YOLO)")
                 return
                 
             # Frame difference motion detection
@@ -945,12 +987,22 @@ class DamagedObjectTrackerServer(Node):
                 if self.servo_motion_detected:
                     motion_reason.append("servo_motion")
 
-                self.get_logger().debug(f"Camera moving - {', '.join(motion_reason)} - skipping detection")
+                log_msg = f"Camera moving - {', '.join(motion_reason)} - skipping detection"
+                if self.session_active:
+                    self.get_logger().warn(log_msg + f" (session active for '{self.session_target_class}')")
+                else:
+                    self.get_logger().debug(log_msg)
                 return
 
-            # Log when detecting during motion in active session
-            if self.camera_is_moving and self.session_active:
-                self.get_logger().debug(f"Detecting during camera motion (session active for '{self.session_target_class}')")
+            # Log motion state during active session
+            if self.session_active:
+                if self.camera_is_moving:
+                    motion_parts = []
+                    if frame_motion_detected:
+                        motion_parts.append(f"frame({moving_pixels}px)")
+                    if self.servo_motion_detected:
+                        motion_parts.append("servo")
+                    self.get_logger().info(f"Camera MOVING ({', '.join(motion_parts)}) - detecting anyway (session active)")
             
             # Run YOLO detection
             results = self.model(frame)[0]
@@ -964,79 +1016,85 @@ class DamagedObjectTrackerServer(Node):
                     detected_class_names = [self.model.names.get(int(cls), str(cls)) for cls in classes]
                     self.get_logger().info(f"YOLO detected {len(xyxy)} objects: {detected_class_names} (scores: {[f'{s:.2f}' for s in scores]})")
                 else:
-                    self.get_logger().debug(f"YOLO detected 0 objects (target: '{self.session_target_class}')")
+                    self.get_logger().info(f"YOLO detected 0 objects (target: '{self.session_target_class}')")
             
-            # Convert to DeepSORT format
-            raw_dets = []
-            for (x1, y1, x2, y2), conf, cls in zip(xyxy, scores, classes):
-                if conf < self.CONF_THRESH:
-                    continue
-                w = x2 - x1
-                h = y2 - y1
-                bbox_xywh = [float(x1), float(y1), float(w), float(h)]
-                raw_dets.append((bbox_xywh, float(conf), int(cls)))
-            
-            # Update tracker
-            tracks = self.tracker.update_tracks(raw_dets, frame=frame)
-            
-            # Process tracks
+            # DETECTION PROCESSING: Two different paths depending on mode
             detected_objects = []
-            for t in tracks:
-                if not t.is_confirmed():
-                    continue
 
-                tid = t.track_id
-                self.unique_ids.add(tid)
+            if self.session_active:
+                # ===== SESSION MODE: Process YOLO detections directly (skip DeepSORT) =====
+                # During DetectClosest, we don't need multi-frame tracking confirmation
+                # Process detections immediately for faster response
+                raw_count = len(xyxy)
+                filtered_count = sum(1 for conf in scores if conf >= self.CONF_THRESH)
+                self.get_logger().info(
+                    f"Session mode: YOLO raw={raw_count}, after conf_thresh>={self.CONF_THRESH}: {filtered_count} "
+                    f"(skipping DeepSORT)"
+                )
 
-                x1, y1, x2, y2 = map(int, t.to_ltrb())
-                cls_id = t.det_class
-                class_name = self.model.names.get(cls_id, str(cls_id))
+                for (x1, y1, x2, y2), conf, cls in zip(xyxy, scores, classes):
+                    if conf < self.CONF_THRESH:
+                        continue
 
-                object_position = self.get_3d_position((x1, y1, x2, y2), self.depth_image)
-                
-                is_duplicate = False
-                if object_position:
-                    is_duplicate = self.is_close_to_existing_object(class_name, object_position)
+                    cls_id = int(cls)
+                    class_name = self.model.names.get(cls_id, str(cls_id))
 
-                is_new_object = tid not in self.saved_ids and not is_duplicate
+                    # Use a temporary ID based on bbox (for tracking within same session)
+                    temp_id = hash((int(x1), int(y1), int(x2), int(y2), cls_id)) % 100000
 
-                object_data = {
-                    'id': tid,
-                    'class_id': cls_id,
-                    'class_name': class_name,
-                    'bbox': (x1, y1, x2, y2),
-                    'object_position': object_position,
-                    'robot_position': self.robot_position,
-                    'timestamp': msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9,
-                    'is_new': is_new_object,
-                    'is_duplicate': is_duplicate
-                }
-                detected_objects.append(object_data)
-                
-                # Draw visualization
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                
-                if is_duplicate:
-                    color = (0, 165, 255)
-                    status = "DUPLICATE"
-                elif is_new_object:
-                    color = (0, 0, 255)
-                    status = "NEW"
-                else:
-                    color = (0, 255, 0)
-                    status = "KNOWN"
-                    
-                text = f"{class_name} ID:{tid} ({status})"
-                
-                if object_position:
-                    x, y, z = object_position
-                    text += f" | Pos: ({x:.2f}, {y:.2f}, {z:.2f})"
-                    
-                cv2.putText(frame, text, (x1, y1-10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                    x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                    object_position = self.get_3d_position((x1, y1, x2, y2), self.depth_image)
+
+                    is_duplicate = False
+                    if object_position:
+                        is_duplicate = self.is_close_to_existing_object(class_name, object_position)
+
+                    is_new_object = temp_id not in self.saved_ids and not is_duplicate
+
+                    object_data = {
+                        'id': temp_id,
+                        'class_id': cls_id,
+                        'class_name': class_name,
+                        'bbox': (x1, y1, x2, y2),
+                        'object_position': object_position,
+                        'robot_position': self.robot_position,
+                        'timestamp': msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9,
+                        'is_new': is_new_object,
+                        'is_duplicate': is_duplicate,
+                        'confidence': float(conf)
+                    }
+                    detected_objects.append(object_data)
+
+                    # Draw visualization for session mode
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 255), 2)  # Magenta for session mode
+                    text = f"{class_name} conf:{conf:.2f}"
+                    if object_position:
+                        x, y, z = object_position
+                        text += f" | ({x:.2f}, {y:.2f}, {z:.2f})"
+                    cv2.putText(frame, text, (x1, y1-10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 255), 2)
+
+            else:
+                # ===== NORMAL MODE: Just run YOLO for visualization, don't save anything =====
+                # Part 2: Removed DeepSORT tracking and automatic saving
+                # Server only saves when client explicitly triggers DetectClosest action
+                for (x1, y1, x2, y2), conf, cls in zip(xyxy, scores, classes):
+                    if conf < self.CONF_THRESH:
+                        continue
+
+                    cls_id = int(cls)
+                    class_name = self.model.names.get(cls_id, str(cls_id))
+                    x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+
+                    # Draw visualization only - no tracking, no saving
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green for detections
+                    text = f"{class_name} conf:{conf:.2f}"
+                    cv2.putText(frame, text, (x1, y1-10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
             
-            # Update detection count
-            self.detection_count += len(detected_objects)
+            # Update detection count (for session mode only)
+            if self.session_active:
+                self.detection_count += len(detected_objects)
 
             # Action session path: select closest candidate of target class and save once
             if self.session_active and self.session_target_class is not None:
@@ -1098,16 +1156,8 @@ class DamagedObjectTrackerServer(Node):
                                 'timestamp': best['timestamp'],
                             }
                             self.session_saved = True
-            else:
-                # Original behavior: save all new objects
-                if detected_objects:
-                    new_objects_count = sum(1 for obj in detected_objects if obj['is_new'])
-                    duplicate_count = sum(1 for obj in detected_objects if obj['is_duplicate'])
-                    self.get_logger().info(
-                        f"Tracking {len(detected_objects)} objects, {new_objects_count} new, "
-                        f"{duplicate_count} duplicates, {len(self.unique_ids)} unique IDs total"
-                    )
-                    self.save_damaged_object_poses(detected_objects, frame)
+            # Part 2: Removed automatic save logic in normal mode
+            # Only save when session_active==True (client explicitly requested)
             
             # Add status overlay
             cv2.putText(frame, f"INSPECTION: {'ACTIVE' if self.inspection_active else 'INACTIVE'}", 

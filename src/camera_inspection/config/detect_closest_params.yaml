@@ -15,8 +15,8 @@ damaged_object_tracker_server:
     # --- Detection/motion gating tuning ---
     # Set true to allow detections even while camera is moving
     disable_motion_gating: false
-    # YOLO confidence threshold
-    conf_thresh: 0.5
+    # YOLO confidence threshold (lowered for DetectClosest to catch moderate-confidence detections)
+    conf_thresh: 0.25
     # Frame-diff motion detection: number of pixels above diff threshold to consider motion
     frame_stationary_thresh: 3000
     # Per-pixel difference threshold (0..255)
