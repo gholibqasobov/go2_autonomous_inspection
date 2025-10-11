@@ -1,276 +1,71 @@
-dog@dog:~/go2_autonomous_inspection$ ros2 run camera_inspection damaged_object_tracker_server --ros-args --params-file src/camera_inspection/config/detect_closest_params.yaml
-/usr/lib/python3/dist-packages/scipy/__init__.py:146: UserWarning: A NumPy version >=1.17.3 and <1.25.0 is required for this version of SciPy (detected version 1.26.4
-  warnings.warn(f"A NumPy version >={np_minversion} and <{np_maxversion}"
-[INFO] [1760103842.713901618] [damaged_object_tracker_server]: Group A: ['half_working_light', 'light_off', 'light_on'] -> servo (1000, 2000)
-[INFO] [1760103842.714212777] [damaged_object_tracker_server]: Group B: ['algae', 'cabinet', 'crack', 'fire_extinguisher', 'moisture', 'peeling', 'stain'] -> servo (1500, 2000)
-[INFO] [1760103842.714558551] [damaged_object_tracker_server]: Loaded camera sequence for Group A
-[INFO] [1760103842.714855851] [damaged_object_tracker_server]: Loaded camera sequence for Group B
-[INFO] [1760103842.720575562] [damaged_object_tracker_server]: Damaged Object Tracker Server initialized
-[INFO] [1760103842.721041508] [damaged_object_tracker_server]: Starting Damaged Object Tracker Server...
-[INFO] [1760103843.596214856] [damaged_object_tracker_server]: DetectClosest session started: class='half_working_light', timeout=60.0s, confirm_frames=3, require_depth=False
-[INFO] [1760103843.596651476] [damaged_object_tracker_server]: Sequence move for 'half_working_light': tilt=1000, pan=2000 (wait 2.50s)
-
-Ultralytics 8.3.202 🚀 Python-3.10.12 torch-2.8.0+cu128 CPU (Intel Core i5-14400)
-
-Ultralytics 8.3.202 🚀 Python-3.10.12 torch-2.8.0+cu128 CPU (Intel Core i5-14400)
-
-Ultralytics 8.3.202 🚀 Python-3.10.12 torch-2.8.0+cu128 CPU (Intel Core i5-14400)
-
-Ultralytics 8.3.202 🚀 Python-3.10.12 torch-2.8.0+cu128 CPU (Intel Core i5-14400)
-
-Ultralytics 8.3.202 🚀 Python-3.10.12 torch-2.8.0+cu128 CPU (Intel Core i5-14400)
-
-Ultralytics 8.3.202 🚀 Python-3.10.12 torch-2.8.0+cu128 CPU (Intel Core i5-14400)
-
-Ultralytics 8.3.202 🚀 Python-3.10.12 torch-2.8.0+cu128 CPU (Intel Core i5-14400)
-
-Ultralytics 8.3.202 🚀 Python-3.10.12 torch-2.8.0+cu128 CPU (Intel Core i5-14400)
-
-Ultralytics 8.3.202 🚀 Python-3.10.12 torch-2.8.0+cu128 CPU (Intel Core i5-14400)
-
-Ultralytics 8.3.202 🚀 Python-3.10.12 torch-2.8.0+cu128 CPU (Intel Core i5-14400)
-
-Ultralytics 8.3.202 🚀 Python-3.10.12 torch-2.8.0+cu128 CPU (Intel Core i5-14400)
-
-Ultralytics 8.3.202 🚀 Python-3.10.12 torch-2.8.0+cu128 CPU (Intel Core i5-14400)
-
-Ultralytics 8.3.202 🚀 Python-3.10.12 torch-2.8.0+cu128 CPU (Intel Core i5-14400)
-
-Ultralytics 8.3.202 🚀 Python-3.10.12 torch-2.8.0+cu128 CPU (Intel Core i5-14400)
-[INFO] [1760103848.500059347] [damaged_object_tracker_server]: Sequence move for 'half_working_light': tilt=1300, pan=2000 (wait 2.50s)
-
-[INFO] [1760103851.503069973] [damaged_object_tracker_server]: Sequence move for 'half_working_light': tilt=2000, pan=2000 (wait 2.00s)
-0: 384x640 1 light_on, 2023.1ms
-Speed: 47.4ms preprocess, 2023.1ms inference, 221.6ms postprocess per image at shape (1, 3, 384, 640)
-
-0: 384x640 (no detections), 869.3ms
-Speed: 14.6ms preprocess, 869.3ms inference, 52.6ms postprocess per image at shape (1, 3, 384, 640)
-YOLO11s summary (fused): 100 layers, 9,417,057 parameters, 0 gradients, 21.3 GFLOPs
-YOLO11s summary (fused): 100 layers, 9,417,057 parameters, 0 gradients, 21.3 GFLOPs
-YOLO11s summary (fused): 100 layers, 9,417,057 parameters, 0 gradients, 21.3 GFLOPs
-YOLO11s summary (fused): 100 layers, 9,417,057 parameters, 0 gradients, 21.3 GFLOPs
-YOLO11s summary (fused): 100 layers, 9,417,057 parameters, 0 gradients, 21.3 GFLOPs
-YOLO11s summary (fused): 100 layers, 9,417,057 parameters, 0 gradients, 21.3 GFLOPs
-YOLO11s summary (fused): 100 layers, 9,417,057 parameters, 0 gradients, 21.3 GFLOPs
-YOLO11s summary (fused): 100 layers, 9,417,057 parameters, 0 gradients, 21.3 GFLOPs
-
-YOLO11s summary (fused): 100 layers, 9,417,057 parameters, 0 gradients, 21.3 GFLOPs
-YOLO11s summary (fused): 100 layers, 9,417,057 parameters, 0 gradients, 21.3 GFLOPs
-YOLO11s summary (fused): 100 layers, 9,417,057 parameters, 0 gradients, 21.3 GFLOPs
-YOLO11s summary (fused): 100 layers, 9,417,057 parameters, 0 gradients, 21.3 GFLOPs
-YOLO11s summary (fused): 100 layers, 9,417,057 parameters, 0 gradients, 21.3 GFLOPs
-YOLO11s summary (fused): 100 layers, 9,417,057 parameters, 0 gradients, 21.3 GFLOPs
-0: 384x640 1 light_on, 798.7ms
-Speed: 24.9ms preprocess, 798.7ms inference, 39.3ms postprocess per image at shape (1, 3, 384, 640)
-
-0: 384x640 1 light_on, 1 half_working_light, 1444.1ms
-Speed: 12.8ms preprocess, 1444.1ms inference, 1285.4ms postprocess per image at shape (1, 3, 384, 640)
-
-0: 384x640 1 light_on, 1 half_working_light, 1692.4ms
-Speed: 29.2ms preprocess, 1692.4ms inference, 502.8ms postprocess per image at shape (1, 3, 384, 640)
-
-0: 384x640 1 crack, 1761.8ms
-Speed: 58.3ms preprocess, 1761.8ms inference, 25.4ms postprocess per image at shape (1, 3, 384, 640)
-
-0: 384x640 2 light_ons, 1 half_working_light, 1183.1ms
-Speed: 6.8ms preprocess, 1183.1ms inference, 107.1ms postprocess per image at shape (1, 3, 384, 640)
-
-0: 384x640 1 light_on, 1 half_working_light, 1522.0ms
-Speed: 19.0ms preprocess, 1522.0ms inference, 9.0ms postprocess per image at shape (1, 3, 384, 640)
-
-0: 384x640 1 light_on, 1 half_working_light, 708.1ms
-Speed: 4.0ms preprocess, 708.1ms inference, 12.9ms postprocess per image at shape (1, 3, 384, 640)
-
-0: 384x640 1 light_on, 1 half_working_light, 1271.8ms
-Speed: 5.6ms preprocess, 1271.8ms inference, 49.4ms postprocess per image at shape (1, 3, 384, 640)
-
-0: 384x640 2 light_ons, 1 half_working_light, 1548.5ms
-Speed: 12.6ms preprocess, 1548.5ms inference, 9.4ms postprocess per image at shape (1, 3, 384, 640)
-
-0: 384x640 2 light_ons, 1 half_working_light, 515.9ms
-Speed: 4.5ms preprocess, 515.9ms inference, 24.0ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103874.010616590] [damaged_object_tracker_server]: Object of class half_working_light at (0.3034417555213378, 0.10682452813604307, 0.05016383091486438) is too close (distance=0.02m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-
-0: 384x640 2 light_ons, 1 half_working_light, 798.3ms
-Speed: 9.3ms preprocess, 798.3ms inference, 32.3ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103875.666444582] [damaged_object_tracker_server]: Object of class half_working_light at (0.3024258745030747, 0.1080462679007447, 0.04921329842617177) is too close (distance=0.02m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-
-0: 384x640 1 light_on, 1 half_working_light, 1405.5ms
-Speed: 11.3ms preprocess, 1405.5ms inference, 10.6ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103876.227375132] [damaged_object_tracker_server]: Object of class half_working_light at (0.3024258745030747, 0.1080462679007447, 0.04921329842617177) is too close (distance=0.02m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-
-0: 384x640 1 light_on, 1 half_working_light, 557.5ms
-Speed: 4.7ms preprocess, 557.5ms inference, 19.7ms postprocess per image at shape (1, 3, 384, 640)
-
-0: 384x640 1 light_on, 1 half_working_light, 1593.0ms
-Speed: 7.0ms preprocess, 1593.0ms inference, 58.2ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103880.055345975] [damaged_object_tracker_server]: Object of class half_working_light at (0.3024345175825168, 0.10726024965835028, 0.0507854202500169) is too close (distance=0.02m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-
-0: 384x640 1 crack, 2070.0ms
-Speed: 11.4ms preprocess, 2070.0ms inference, 859.9ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103881.064376105] [damaged_object_tracker_server]: Object of class half_working_light at (0.3034281292888308, 0.10761306191436397, 0.05174112419207743) is too close (distance=0.02m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-
-0: 384x640 (no detections), 839.2ms
-Speed: 16.2ms preprocess, 839.2ms inference, 49.3ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103882.111667757] [damaged_object_tracker_server]: Object of class half_working_light at (0.3004435903122194, 0.10655457278078005, 0.051232195101663554) is too close (distance=0.02m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-
-0: 384x640 2 light_ons, 1 half_working_light, 913.1ms
-Speed: 20.8ms preprocess, 913.1ms inference, 57.0ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103884.222574356] [damaged_object_tracker_server]: Object of class half_working_light at (0.3004448168089477, 0.10655459012112428, 0.0504513056431089) is too close (distance=0.02m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-
-0: 384x640 1 crack, 1393.3ms
-Speed: 22.4ms preprocess, 1393.3ms inference, 18.8ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103884.421088980] [damaged_object_tracker_server]: Object of class half_working_light at (0.29845511603537844, 0.10584893058389828, 0.05011719103620089) is too close (distance=0.02m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-
-0: 384x640 1 crack, 874.2ms
-Speed: 5.5ms preprocess, 874.2ms inference, 64.3ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103885.409326192] [damaged_object_tracker_server]: Object of class half_working_light at (0.3004448168089477, 0.10655459012112428, 0.0504513056431089) is too close (distance=0.02m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-
-0: 384x640 1 crack, 1087.5ms
-Speed: 42.0ms preprocess, 1087.5ms inference, 78.9ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103886.664345537] [damaged_object_tracker_server]: Object of class half_working_light at (0.2994499664221631, 0.10620176035251129, 0.05028424833965489) is too close (distance=0.02m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-
-0: 384x640 (no detections), 1996.3ms
-Speed: 15.1ms preprocess, 1996.3ms inference, 73.8ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103888.725064911] [damaged_object_tracker_server]: Object of class half_working_light at (0.29845511603537844, 0.10584893058389828, 0.05011719103620089) is too close (distance=0.02m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-
-0: 384x640 1 crack, 455.4ms
-Speed: 35.3ms preprocess, 455.4ms inference, 41.3ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103889.251133802] [damaged_object_tracker_server]: Object of class half_working_light at (0.29845511603537844, 0.10584893058389828, 0.05011719103620089) is too close (distance=0.02m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-
-0: 384x640 1 crack, 4406.7ms
-Speed: 13.0ms preprocess, 4406.7ms inference, 223.7ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103893.995697260] [damaged_object_tracker_server]: Object of class half_working_light at (0.2994499664221631, 0.10620176035251129, 0.05028424833965489) is too close (distance=0.02m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-
-0: 384x640 (no detections), 770.3ms
-Speed: 29.4ms preprocess, 770.3ms inference, 40.4ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103894.787146951] [damaged_object_tracker_server]: Object of class half_working_light at (0.29746026564859385, 0.10549610081528529, 0.04995013373274689) is too close (distance=0.01m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-
-0: 384x640 (no detections), 474.4ms
-Speed: 12.8ms preprocess, 474.4ms inference, 30.0ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103895.304105687] [damaged_object_tracker_server]: Object of class half_working_light at (0.29746026564859385, 0.10549610081528529, 0.04995013373274689) is too close (distance=0.01m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-
-0: 384x640 (no detections), 1130.9ms
-Speed: 10.0ms preprocess, 1130.9ms inference, 47.1ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103896.519155390] [damaged_object_tracker_server]: Object of class half_working_light at (0.29746026564859385, 0.10549610081528529, 0.04995013373274689) is too close (distance=0.01m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-
-0: 384x640 1 crack, 2504.5ms
-Speed: 24.1ms preprocess, 2504.5ms inference, 123.8ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103899.245145770] [damaged_object_tracker_server]: Object of class half_working_light at (0.2954705648750247, 0.1047904412780593, 0.04961601912583887) is too close (distance=0.01m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-
-0: 384x640 (no detections), 1533.5ms
-Speed: 96.4ms preprocess, 1533.5ms inference, 58.5ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103900.896145362] [damaged_object_tracker_server]: Object of class half_working_light at (0.2964654152618093, 0.10514327104667229, 0.04978307642929289) is too close (distance=0.01m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-0: 384x640 (no detections), 264.8ms
-Speed: 20.8ms preprocess, 264.8ms inference, 0.5ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103901.170802046] [damaged_object_tracker_server]: Object of class half_working_light at (0.31337787183714744, 0.11114137711309321, 0.052623050588010936) is too close (distance=0.03m) to existing object at (0.28352194243558904, 0.1012933434284839, 0.04761133148439084)
-0: 384x640 1 crack, 175.2ms
-Speed: 1.8ms preprocess, 175.2ms inference, 0.7ms postprocess per image at shape (1, 3, 384, 640)
-0: 384x640 1 crack, 216.4ms
-Speed: 8.4ms preprocess, 216.4ms inference, 0.9ms postprocess per image at shape (1, 3, 384, 640)
-0: 384x640 1 crack, 208.5ms
-Speed: 3.3ms preprocess, 208.5ms inference, 0.8ms postprocess per image at shape (1, 3, 384, 640)
-0: 384x640 (no detections), 206.6ms
-Speed: 2.6ms preprocess, 206.6ms inference, 0.6ms postprocess per image at shape (1, 3, 384, 640)
-0: 384x640 (no detections), 235.8ms
-Speed: 2.9ms preprocess, 235.8ms inference, 0.6ms postprocess per image at shape (1, 3, 384, 640)
-0: 384x640 (no detections), 208.0ms
-Speed: 3.3ms preprocess, 208.0ms inference, 0.4ms postprocess per image at shape (1, 3, 384, 640)
-0: 384x640 (no detections), 226.7ms
-Speed: 5.8ms preprocess, 226.7ms inference, 0.5ms postprocess per image at shape (1, 3, 384, 640)
-0: 384x640 (no detections), 190.9ms
-Speed: 3.7ms preprocess, 190.9ms inference, 0.4ms postprocess per image at shape (1, 3, 384, 640)
-0: 384x640 (no detections), 177.2ms
-Speed: 2.7ms preprocess, 177.2ms inference, 0.4ms postprocess per image at shape (1, 3, 384, 640)
-0: 384x640 (no detections), 197.0ms
-Speed: 2.6ms preprocess, 197.0ms inference, 3.3ms postprocess per image at shape (1, 3, 384, 640)
-0: 384x640 (no detections), 190.1ms
-Speed: 2.6ms preprocess, 190.1ms inference, 0.8ms postprocess per image at shape (1, 3, 384, 640)
-0: 384x640 (no detections), 195.6ms
-Speed: 2.4ms preprocess, 195.6ms inference, 0.5ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760103903.767884783] [damaged_object_tracker_server]: DetectClosest session timed out
-[WARN] [1760103903.770245759] [damaged_object_tracker_server]: Goal state not set, assuming aborted. Goal ID: [250 195 190 251   4  49  64 154 189 224  44  30  75 201 236 198]
-0: 384x640 (no detections), 203.9ms
-Speed: 2.6ms preprocess, 203.9ms inference, 0.5ms postprocess per image at shape (1, 3, 384, 640)
-[INFO] [1760104323.921354260] [damaged_object_tracker_server]: DetectClosest session started: class='half_working_light', timeout=60.0s, confirm_frames=3, require_depth=False
-[INFO] [1760104323.921769722] [damaged_object_tracker_server]: Sequence move for 'half_working_light': tilt=1000, pan=2000 (wait 2.50s)
-
-
-
-
-
-0: 384x640 1 light_on, 204.7ms
-Speed: 3.5ms preprocess, 204.7ms inference, 1.4ms postprocess per image at shape (1, 3, 384, 640)
-
-
-
-
-
-
-
-0: 384x640 1 light_on, 216.7ms
-Speed: 1.8ms preprocess, 216.7ms inference, 3.8ms postprocess per image at shape (1, 3, 384, 640)
-
-
-
-
-
-0: 384x640 1 light_on, 244.0ms
-Speed: 3.6ms preprocess, 244.0ms inference, 12.2ms postprocess per image at shape (1, 3, 384, 640)
-
-0: 384x640 (no detections), 793.0ms
-Speed: 8.8ms preprocess, 793.0ms inference, 47.0ms postprocess per image at shape (1, 3, 384, 640)
-
-[INFO] [1760104328.656517507] [damaged_object_tracker_server]: Sequence move for 'half_working_light': tilt=1300, pan=2000 (wait 2.50s)
-0: 384x640 1 light_on, 1590.3ms
-Speed: 21.4ms preprocess, 1590.3ms inference, 164.8ms postprocess per image at shape (1, 3, 384, 640)
-
-0: 384x640 1 light_on, 1150.5ms
-Speed: 25.7ms preprocess, 1150.5ms inference, 92.9ms postprocess per image at shape (1, 3, 384, 640)
-
-[INFO] [1760104331.457686409] [damaged_object_tracker_server]: Sequence move for 'half_working_light': tilt=2000, pan=2000 (wait 2.00s)
-0: 384x640 1 light_on, 1662.8ms
-Speed: 15.5ms preprocess, 1662.8ms inference, 124.8ms postprocess per image at shape (1, 3, 384, 640)
-0: 384x640 1 light_on, 1167.3ms
-Speed: 26.7ms preprocess, 1167.3ms inference, 0.7ms postprocess per image at shape (1, 3, 384, 640)
-0: 384x640 1 light_on, 190.5ms
-Speed: 3.0ms preprocess, 190.5ms inference, 0.7ms postprocess per image at shape (1, 3, 384, 640)
-0: 384x640 1 light_on, 191.9ms
-Speed: 6.2ms preprocess, 191.9ms inference, 0.8ms postprocess per image at shape (1, 3, 384, 640)
-0: 384x640 1 light_on, 274.0ms
-Speed: 4.6ms preprocess, 274.0ms inference, 1.1ms postprocess per image at shape (1, 3, 384, 640)
-[WARN] [1760104334.600911364] [damaged_object_tracker_server]: No valid depth values in region
-0: 384x640 1 half_working_light, 204.9ms
-Speed: 2.3ms preprocess, 204.9ms inference, 0.9ms postprocess per image at shape (1, 3, 384, 640)
-[WARN] [1760104334.732576838] [damaged_object_tracker_server]: No valid depth values in region
-0: 384x640 1 light_on, 1 half_working_light, 254.7ms
-Speed: 4.5ms preprocess, 254.7ms inference, 1.1ms postprocess per image at shape (1, 3, 384, 640)
-[WARN] [1760104334.992198134] [damaged_object_tracker_server]: No valid depth values in region
-0: 384x640 1 light_on, 1 half_working_light, 325.1ms
-Speed: 5.3ms preprocess, 325.1ms inference, 0.6ms postprocess per image at shape (1, 3, 384, 640)
-[WARN] [1760104335.322543486] [damaged_object_tracker_server]: No valid depth values in region
-0: 384x640 1 light_on, 1 half_working_light, 176.7ms
-Speed: 2.6ms preprocess, 176.7ms inference, 0.7ms postprocess per image at shape (1, 3, 384, 640)
-[WARN] [1760104335.503066217] [damaged_object_tracker_server]: No valid depth values in region
-0: 384x640 1 light_on, 1 half_working_light, 209.8ms
-Speed: 2.7ms preprocess, 209.8ms inference, 1.2ms postprocess per image at shape (1, 3, 384, 640)
-[WARN] [1760104335.718768571] [damaged_object_tracker_server]: No valid depth values in region
-0: 384x640 1 light_on, 1 half_working_light, 247.9ms
-Speed: 4.7ms preprocess, 247.9ms inference, 0.8ms postprocess per image at shape (1, 3, 384, 640)
-[WARN] [1760104335.972344839] [damaged_object_tracker_server]: No valid depth values in region
-0: 384x640 1 light_on, 1 half_working_light, 223.8ms
-Speed: 3.6ms preprocess, 223.8ms inference, 0.6ms postprocess per image at shape (1, 3, 384, 640)
-[WARN] [1760104336.200463208] [damaged_object_tracker_server]: No valid depth values in region
-0: 384x640 1 light_on, 1 half_working_light, 238.4ms
-Speed: 2.7ms preprocess, 238.4ms inference, 5.7ms postprocess per image at shape (1, 3, 384, 640)
-[WARN] [1760104336.528604758] [damaged_object_tracker_server]: No valid depth values in region
-0: 384x640 1 light_on, 1 half_working_light, 249.9ms
-Speed: 3.5ms preprocess, 249.9ms inference, 0.9ms postprocess per image at shape (1, 3, 384, 640)
-[WARN] [1760104336.793473365] [damaged_object_tracker_server]: No valid depth values in region
-0: 384x640 1 half_working_light, 247.5ms
-Speed: 1.9ms preprocess, 247.5ms inference, 0.8ms postprocess per image at shape (1, 3, 384, 640)
-[WARN] [1760104337.004425183] [damaged_object_tracker_server]: No valid depth values in region
-[INFO] [1760104384.107910967] [damaged_object_tracker_server]: DetectClosest session timed out
-[WARN] [1760104384.110426459] [damaged_object_tracker_server]: Goal state not set, assuming aborted. Goal ID: [  4 137 176  18 229 234  79 224 174  71 210  67 244  13 160 120]
-
-
+[
+  {
+    "id": 67984,
+    "class_name": "light_off",
+    "image_file": "object_67984_20251011_153352.jpg",
+    "timestamp": 1760178793.628023,
+    "bbox": {
+      "x1": 543,
+      "y1": 622,
+      "x2": 766,
+      "y2": 719
+    },
+    "robot_position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "world_position": {
+      "x": 1.1415277996824764,
+      "y": -0.315819100135283,
+      "z": -0.6033169917791797
+    },
+    "transformation_success": true
+  },
+  {
+    "id": 68754,
+    "class_name": "light_off",
+    "image_file": "object_68754_20251011_153731.jpg",
+    "timestamp": 1760179011.7599585,
+    "bbox": {
+      "x1": 546,
+      "y1": 622,
+      "x2": 763,
+      "y2": 719
+    },
+    "robot_position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "world_position": {
+      "x": 0.46324323561058234,
+      "y": -0.1281625045443358,
+      "z": -0.2448319834596848
+    },
+    "transformation_success": true
+  },
+  {
+    "id": 15231,
+    "class_name": "fire_extinguisher",
+    "image_file": "object_15231_20251011_154954.jpg",
+    "timestamp": 1760179754.7847,
+    "bbox": {
+      "x1": 0,
+      "y1": 15,
+      "x2": 832,
+      "y2": 637
+    },
+    "robot_position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "world_position": {
+      "x": 0.697052738351169,
+      "y": 0.0700448723705096,
+      "z": 0.04357870444974829
+    },
+    "transformation_success": true
+  }
+]
