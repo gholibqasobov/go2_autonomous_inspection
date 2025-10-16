@@ -1,5 +1,5 @@
 # Goal
-string class_name
+string target_id
 float32 timeout_s
 int32 confirm_frames
 bool require_depth
@@ -7,7 +7,7 @@ bool require_depth
 # Result
 bool success
 string reason
-int32 saved_id
+string saved_id
 int32 bbox_x1
 int32 bbox_y1
 int32 bbox_x2
