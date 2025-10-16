@@ -29,12 +29,12 @@ def run():
     cmd = ["ros2", "run", "go2_waypoint_nav", "inspection_client_main"] + obj_ids
     print("Running command:", " ".join(cmd))
 
-    '''try:
+    try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         print("ROS2 output:\n", result.stdout)
         print("ROS2 errors:\n", result.stderr)
     except subprocess.CalledProcessError as e:
-        print("ROS2 command failed:", e.stderr)'''
+        print("ROS2 command failed:", e.stderr)
     
     data = {"obj_ids": obj_ids}
     print('data:     ', data)
