@@ -1,0 +1,1 @@
+{"client_ts": 1760092160.715903, "action_name": "/damaged_object_tracker_server/detect_closest", "class_name": "light_on", "success": false, "reason": "timeout", "params": {"timeout_s": 30.0, "confirm_frames": 3, "require_depth": false}, "saved_id": -1, "bbox": [0, 0, 0, 0], "world": [0.0, 0.0, 0.0], "image_file": "", "server_ts": 0.0}

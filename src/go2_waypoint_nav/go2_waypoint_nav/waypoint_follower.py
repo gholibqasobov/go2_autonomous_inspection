@@ -39,7 +39,7 @@ class GoalPosePublisher(Node):
 
         elif self.step == 3:
             self.get_logger().info("Waiting for auto mode to activate...")
-            #time.sleep(2)  # wait 2 seconds
+            time.sleep(1)  # wait 2 seconds
             self.step += 1
 
         elif self.step == 4:

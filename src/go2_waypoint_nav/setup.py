@@ -27,6 +27,12 @@ setup(
             'camera_servo_server = go2_waypoint_nav.camera_servo_server:main',
             'waypoint_client = go2_waypoint_nav.waypoint_follower_client:main',
             'inspection_client = go2_waypoint_nav.waypoint_inspection_client:main',
+            'waypoint_saver_with_object_id = go2_waypoint_nav.waypoint_saver_with_object_id:main',
+            'track_waypoint_reached = go2_waypoint_nav.track_waypoint_reached:main',
+            'rotate_robot = go2_waypoint_nav.rotate_robot:main',
+            'rotate_robot_server = go2_waypoint_nav.rotate_robot_server:main',
+            'rotate_robot_client = go2_waypoint_nav.rotate_robot_client:main',
+            'inspection_client_main = go2_waypoint_nav.inspection_client:main',
         ],
     },
 )

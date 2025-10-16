@@ -39,3 +39,17 @@ The robot will navigate to the saved goal points.
 ros2 action send_goal /camera_servo_action camera_servo_interfaces/action/CameraServo "{start: true}" --feedback
 ```
 
+
+
+
+
+Main node to run the inspection:
+```bash
+ros2 run go2_waypoint_nav inspection_client_main 
+```
+
+Need to start:
+
+- Camera Inspection Server
+- Waypoint Follower Server
+- Rotate Robot Server
