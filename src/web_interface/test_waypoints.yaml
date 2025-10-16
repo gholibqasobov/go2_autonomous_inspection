@@ -1,0 +1,29 @@
+waypoints:
+- header:
+    frame_id: map
+  pose:
+    object:
+      object_id: 1:light_on:1
+    orientation:
+      w: 0.9766022602988735
+      x: 0.0
+      y: 0.0
+      z: -0.21505354026179457
+    position:
+      x: 5.558703899383545
+      y: 2.4341938495635986
+      z: 0.3659999966621399
+- header:
+    frame_id: map
+  pose:
+    object:
+      object_id: 1:light_on:5
+    orientation:
+      w: 0.9766022602988735
+      x: 0.0
+      y: 0.0
+      z: -0.21505354026179457
+    position:
+      x: 5.558703899383545
+      y: 2.4341938495635986
+      z: 0.3659999966621399

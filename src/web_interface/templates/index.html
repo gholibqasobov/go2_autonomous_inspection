@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Select Points</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #fafafa;
+      color: #333;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* Header (same style as gallery) */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #333;
+      color: white;
+      padding: 10px 20px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .back-button {
+      background-color: #007bff;
+      border: none;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      text-decoration: none;
+    }
+
+    .back-button:hover {
+      background-color: #0056b3;
+    }
+
+    .content {
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 20px;
+      text-align: center;
+    }
+
+    /* Centered points list grid */
+    .points-container {
+    display: flex;
+    justify-content: center; /* Centers horizontally */
+    align-items: center; /* Centers vertically (optional) */
+    flex-wrap: wrap; /* Allows wrapping if there are many points */
+    gap: 20px;
+    min-height: 60vh; /* So it’s vertically centered */
+  }
+
+  .point-item {
+    background-color: #f9f9ff;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 15px 20px;
+    width: 250px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+
+  .send-btn-container {
+    text-align: center;
+    margin-top: 30px;
+  }
+
+    .point-item:hover {
+      background: #f1f5ff;
+      transform: translateY(-2px);
+    }
+
+    .point-item input {
+      margin-right: 6px;
+      transform: scale(1.2);
+    }
+
+    button {
+      display: block;
+      margin: 30px auto;
+      padding: 10px 24px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: 0.2s;
+    }
+
+    button:hover {
+      background: #1e4fd1;
+    }
+
+    /* Loading overlay */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      display: none;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid rgba(255, 255, 255, 0.3);
+      border-top: 5px solid #83c1d4;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Select Points</h1>
+    <a href="/" class="back-button">← Back</a>
+  </header>
+
+  <div class="points-container">
+    {% for point in points %}
+    <div class="point-item">
+      <label>
+        <input type="checkbox" value="{{ loop.index0 }}">
+        <strong>Point{{ loop.index }} {{ point['pose']['object']['object_id'] }}</strong>
+      </label>
+      <p>X: {{ '%.3f'|format(point['pose']['position']['x']) }}</p>
+      <p>Y: {{ '%.3f'|format(point['pose']['position']['y']) }}</p>
+    </div>
+    {% endfor %}
+  </div>
+
+    <button id="sendBtn">Send</button>
+  </div>
+
+  <div class="loading-overlay" id="loading">
+    <div class="spinner"></div>
+  </div>
+
+  <script>
+    const points = {{ points | tojson }};
+
+    document.getElementById("sendBtn").addEventListener("click", () => {
+      const selectedIndices = Array.from(document.querySelectorAll('input[type=checkbox]:checked'))
+        .map(cb => parseInt(cb.value));
+      const selectedPoints = selectedIndices.map(i => points[i]);
+
+      if (selectedPoints.length === 0) {
+        alert("Please select at least one point!");
+        return;
+      }
+
+      let loadingDiv = document.getElementById("loading");
+      loadingDiv.style.display = "flex";
+
+      fetch("/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ points: selectedPoints })
+      })
+      .then(response => {
+        if (response.redirected) {
+          loadingDiv.style.display = "none";
+          window.location.href = response.url;
+        } else {
+          loadingDiv.style.display = "none";
+          return response.json().then(data => {
+            console.log("Server response:", data);
+            alert("Server response: " + JSON.stringify(data));
+          });
+        }
+      })
+      .catch(error => {
+        loadingDiv.style.display = "none";
+        console.error("Fetch error:", error);
+        alert("Error: " + error);
+      });
+    });
+  </script>
+
+</body>
+</html>
