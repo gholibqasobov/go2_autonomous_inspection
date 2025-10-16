@@ -1,71 +1,111 @@
-[
-  {
-    "id": 67984,
-    "class_name": "light_off",
-    "image_file": "object_67984_20251011_153352.jpg",
-    "timestamp": 1760178793.628023,
-    "bbox": {
-      "x1": 543,
-      "y1": 622,
-      "x2": 766,
-      "y2": 719
+{
+  "objects": [
+    {
+      "object_id": "99874",
+      "target_id": "1:light_on:1",
+      "class_id": 1,
+      "class_name": "light_on",
+      "confidence": 0.87,
+      "timestamp": "20251012_204505",
+      "image_file": "object_99874_20251012_204505.jpg",
+      "bbox": {
+        "x1": 723,
+        "y1": 86,
+        "x2": 869,
+        "y2": 607,
+        "center_x": 796,
+        "center_y": 346
+      },
+      "robot_position": {
+        "x": 2.45,
+        "y": -1.32,
+        "z": 0.0,
+        "yaw": 0.78
+      },
+      "world_position": {
+        "x": 5.67,
+        "y": 2.89,
+        "z": 1.85,
+        "valid": true
+      },
+      "depth": 2.34,
+      "detection_metadata": {
+        "confirm_frames": 1,
+        "detection_count": 1
+      }
     },
-    "robot_position": {
-      "x": 0,
-      "y": 0,
-      "z": 0
+    {
+      "object_id": "33875",
+      "target_id": "2:light_on:1",
+      "class_id": 1,
+      "class_name": "light_on",
+      "confidence": 0.8,
+      "timestamp": "20251012_203441",
+      "image_file": "object_33875_20251012_203441.jpg",
+      "bbox": {
+        "x1": 514,
+        "y1": 374,
+        "x2": 925,
+        "y2": 618,
+        "center_x": 719,
+        "center_y": 496
+      },
+      "robot_position": {
+        "x": 3.12,
+        "y": -0.87,
+        "z": 0.0,
+        "yaw": 1.23
+      },
+      "world_position": {
+        "x": 6.34,
+        "y": 1.56,
+        "z": 2.12,
+        "valid": true
+      },
+      "depth": 1.89,
+      "detection_metadata": {
+        "confirm_frames": 1,
+        "detection_count": 1
+      }
     },
-    "world_position": {
-      "x": 1.1415277996824764,
-      "y": -0.315819100135283,
-      "z": -0.6033169917791797
-    },
-    "transformation_success": true
-  },
-  {
-    "id": 68754,
-    "class_name": "light_off",
-    "image_file": "object_68754_20251011_153731.jpg",
-    "timestamp": 1760179011.7599585,
-    "bbox": {
-      "x1": 546,
-      "y1": 622,
-      "x2": 763,
-      "y2": 719
-    },
-    "robot_position": {
-      "x": 0,
-      "y": 0,
-      "z": 0
-    },
-    "world_position": {
-      "x": 0.46324323561058234,
-      "y": -0.1281625045443358,
-      "z": -0.2448319834596848
-    },
-    "transformation_success": true
-  },
-  {
-    "id": 15231,
-    "class_name": "fire_extinguisher",
-    "image_file": "object_15231_20251011_154954.jpg",
-    "timestamp": 1760179754.7847,
-    "bbox": {
-      "x1": 0,
-      "y1": 15,
-      "x2": 832,
-      "y2": 637
-    },
-    "robot_position": {
-      "x": 0,
-      "y": 0,
-      "z": 0
-    },
-    "world_position": {
-      "x": 0.697052738351169,
-      "y": 0.0700448723705096,
-      "z": 0.04357870444974829
-    },
-    "transformation_success": true
+    {
+      "object_id": "74759",
+      "target_id": "1:fire_extinguisher:1",
+      "class_id": 2,
+      "class_name": "fire_extinguisher",
+      "confidence": 0.72,
+      "timestamp": "20251012_203441",
+      "image_file": "object_74759_20251012_203441.jpg",
+      "bbox": {
+        "x1": 658,
+        "y1": 497,
+        "x2": 768,
+        "y2": 656,
+        "center_x": 713,
+        "center_y": 576
+      },
+      "robot_position": {
+        "x": 4.67,
+        "y": -2.15,
+        "z": 0.0,
+        "yaw": 0.45
+      },
+      "world_position": {
+        "x": 8.92,
+        "y": -1.23,
+        "z": 0.65,
+        "valid": true
+      },
+      "depth": 3.12,
+      "detection_metadata": {
+        "confirm_frames": 1,
+        "detection_count": 1
+      }
+    }
+  ],
+  "metadata": {
+    "total_detections": 3,
+    "inspection_date": "2025-10-12",
+    "format_version": "1.0"
   }
-]
+}
