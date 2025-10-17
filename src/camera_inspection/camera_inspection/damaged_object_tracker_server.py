@@ -168,6 +168,7 @@ class DamagedObjectTrackerServer(Node):
 
         # Session state for DetectClosest
         self.session_active = False
+        self.session_target_id = None
         self.session_target_class = None
         self.session_require_depth = False
         self.session_confirm_frames = 3
@@ -301,6 +302,15 @@ class DamagedObjectTrackerServer(Node):
         if class_name in self.group_b_classes and self.group_sequences['B'] is not None:
             return self.group_sequences['B']
         return None
+
+    @staticmethod
+    def _extract_class_from_target_id(target_id):
+        parts = target_id.split(':')
+        if len(parts) != 3:
+            raise ValueError("target_id must follow '<prefix>:<class>:<suffix>' format")
+        if any(len(part.strip()) == 0 for part in parts):
+            raise ValueError("target_id segments must be non-empty")
+        return parts[1].strip()
 
     def set_camera_for_class(self, class_name):
         """Command servos to a predefined angle depending on class group.
@@ -630,9 +640,18 @@ class DamagedObjectTrackerServer(Node):
         if self.session_active:
             self.get_logger().warn('DetectClosest goal rejected: session already active')
             return GoalResponse.REJECT
-        if not goal_request.class_name:
-            self.get_logger().warn('DetectClosest goal rejected: empty class_name')
+
+        target_id = goal_request.target_id
+        if not target_id:
+            self.get_logger().warn('DetectClosest goal rejected: empty target_id')
             return GoalResponse.REJECT
+
+        try:
+            _ = self._extract_class_from_target_id(target_id)
+        except ValueError as exc:
+            self.get_logger().warn(f'DetectClosest goal rejected: invalid target_id "{target_id}": {exc}')
+            return GoalResponse.REJECT
+
         return GoalResponse.ACCEPT
 
     def detect_cancel_callback(self, goal_handle):
@@ -641,6 +660,7 @@ class DamagedObjectTrackerServer(Node):
 
     def _clear_session(self):
         self.session_active = False
+        self.session_target_id = None
         self.session_target_class = None
         self.session_require_depth = False
         self.session_confirm_frames = 3
@@ -660,7 +680,23 @@ class DamagedObjectTrackerServer(Node):
         goal = goal_handle.request
 
         # Extract parameters with defaults
-        class_name = goal.class_name
+        target_id = goal.target_id.strip()
+        try:
+            class_name = self._extract_class_from_target_id(target_id)
+        except ValueError as exc:
+            self.get_logger().error(f"DetectClosest goal aborted: invalid target_id '{target_id}': {exc}")
+            result = DetectClosest.Result()
+            result.success = False
+            result.reason = 'invalid_target_id'
+            result.saved_id = ''
+            result.bbox_x1 = result.bbox_y1 = result.bbox_x2 = result.bbox_y2 = 0
+            result.world_x = result.world_y = result.world_z = 0.0
+            result.image_file = ''
+            result.timestamp = 0.0
+            goal_handle.abort()
+            self.current_goal_handle = None
+            return result
+
         timeout_s = goal.timeout_s if goal.timeout_s > 0.0 else 20.0
         confirm_frames = goal.confirm_frames if goal.confirm_frames > 0 else 1  # Default 1 for fast response with direct YOLO
         require_depth = bool(goal.require_depth)
@@ -680,13 +716,14 @@ class DamagedObjectTrackerServer(Node):
 
         # Activate session
         self.session_active = True
+        self.session_target_id = target_id
         self.session_target_class = class_name
         self.session_require_depth = require_depth
         self.session_confirm_frames = confirm_frames
         self.session_saved = False
         self.session_result_info = None
         self.get_logger().info(
-            f"DetectClosest session started: class='{class_name}', timeout={timeout_s}s, confirm_frames={confirm_frames}, require_depth={require_depth}"
+            f"DetectClosest session started: target_id='{target_id}', class='{class_name}', timeout={timeout_s}s, confirm_frames={confirm_frames}, require_depth={require_depth}"
         )
 
         # Start non-blocking servo sequence using timer-based state machine
@@ -752,7 +789,7 @@ class DamagedObjectTrackerServer(Node):
             info = self.session_result_info
             result.success = True
             result.reason = 'saved'
-            result.saved_id = int(info.get('id', -1))
+            result.saved_id = str(info.get('id', ''))
             x1, y1, x2, y2 = info.get('bbox', (0, 0, 0, 0))
             result.bbox_x1 = int(x1)
             result.bbox_y1 = int(y1)
@@ -769,12 +806,12 @@ class DamagedObjectTrackerServer(Node):
             result.timestamp = float(info.get('timestamp', 0.0))
 
             goal_handle.succeed()
-            self.get_logger().info(f'DetectClosest session completed: found object ID {result.saved_id}')
+            self.get_logger().info(f"DetectClosest session completed: saved target_id '{result.saved_id}'")
         else:
             # Not found: no object detected during servo sequence
             result.success = False
             result.reason = 'not_found'
-            result.saved_id = -1
+            result.saved_id = ''
             result.bbox_x1 = result.bbox_y1 = result.bbox_x2 = result.bbox_y2 = 0
             result.world_x = result.world_y = result.world_z = 0.0
             result.image_file = ''
@@ -826,7 +863,7 @@ class DamagedObjectTrackerServer(Node):
                 
                 obj_id = obj.get('id')
                 if obj_id is not None:
-                    self.saved_ids.add(obj_id)
+                    self.saved_ids.add(str(obj_id))
     
     def is_close_to_existing_object(self, class_name, position):
         """Check if a detected object is too close to an existing saved object"""
@@ -1150,8 +1187,8 @@ class DamagedObjectTrackerServer(Node):
                     cls_id = int(cls)
                     class_name = self.model.names.get(cls_id, str(cls_id))
 
-                    # Use a temporary ID based on bbox (for tracking within same session)
-                    temp_id = hash((int(x1), int(y1), int(x2), int(y2), cls_id)) % 100000
+                    # Use a temporary tracking ID based on bbox (for frame-to-frame stability checks)
+                    track_id = hash((int(x1), int(y1), int(x2), int(y2), cls_id)) % 100000
 
                     x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
                     object_position = self.get_3d_position((x1, y1, x2, y2), self.depth_image)
@@ -1160,10 +1197,12 @@ class DamagedObjectTrackerServer(Node):
                     if object_position:
                         is_duplicate = self.is_close_to_existing_object(class_name, object_position)
 
-                    is_new_object = temp_id not in self.saved_ids and not is_duplicate
+                    is_new_object = (self.session_target_id not in self.saved_ids) and not is_duplicate
 
                     object_data = {
-                        'id': temp_id,
+                        'track_id': track_id,
+                        'id': self.session_target_id,
+                        'target_id': self.session_target_id,
                         'class_id': cls_id,
                         'class_name': class_name,
                         'bbox': (x1, y1, x2, y2),
@@ -1242,16 +1281,16 @@ class DamagedObjectTrackerServer(Node):
                         self.session_closest_px_dist = center_dist(best)
 
                         # Stability check
-                        if self.session_closest_track_id == best['id']:
+                        if self.session_closest_track_id == best['track_id']:
                             self.session_closest_stable_frames += 1
                         else:
-                            self.session_closest_track_id = best['id']
+                            self.session_closest_track_id = best['track_id']
                             self.session_closest_stable_frames = 1
 
                         if (self.session_closest_stable_frames >= self.session_confirm_frames
                                 and not self.session_saved and not best['is_duplicate']):
                             self.get_logger().info(
-                                f"DetectClosest selecting ID {best['id']} at {self.session_closest_px_dist:.1f}px for class '{self.session_target_class}'"
+                                f"DetectClosest selecting target_id {best['id']} at {self.session_closest_px_dist:.1f}px for class '{self.session_target_class}'"
                             )
                             # Save only this object
                             self.save_damaged_object_poses([best], frame)
@@ -1314,7 +1353,7 @@ class DamagedObjectTrackerServer(Node):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         for obj in new_objects:
-            obj_id = obj['id']
+            obj_id = str(obj['id'])
             x1, y1, x2, y2 = obj['bbox']
             class_name = obj.get('class_name')
             object_position = obj.get('object_position')
@@ -1335,7 +1374,8 @@ class DamagedObjectTrackerServer(Node):
                 self.get_logger().warn(f"Empty region for object ID {obj_id}, skipping")
                 continue
                 
-            img_filename = f"object_{obj_id}_{timestamp}.jpg"
+            safe_id = obj_id.replace(':', '_')
+            img_filename = f"object_{safe_id}_{timestamp}.jpg"
             img_path = os.path.join(self.output_dir, img_filename)
             cv2.imwrite(img_path, obj_img)
             

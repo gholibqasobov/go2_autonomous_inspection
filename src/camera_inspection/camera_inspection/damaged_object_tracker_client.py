@@ -18,8 +18,8 @@ class DetectClosestClient(Node):
     """Action client for the DetectClosest server (damaged_object_tracker_client).
 
     Usage examples:
-      ros2 run camera_inspection damaged_object_tracker_client --class crack
-      ros2 run camera_inspection damaged_object_tracker_client --class crack \
+      ros2 run camera_inspection damaged_object_tracker_client --target-id 1:light_on:1
+      ros2 run camera_inspection damaged_object_tracker_client --target-id 1:light_on:1 \
           --timeout 30 --confirm 3 --require-depth
     """
 
@@ -39,15 +39,16 @@ class DetectClosestClient(Node):
             f"candidates={fb.candidates} camera_moving={fb.camera_moving} depth_ready={fb.depth_ready}"
         )
 
-    def send_goal(self, class_name: str, timeout_s: float, confirm_frames: int, require_depth: bool):
+    def send_goal(self, target_id: str, timeout_s: float, confirm_frames: int, require_depth: bool):
+        class_name = self.extract_class_from_target_id(target_id)
         goal = DetectClosest.Goal()
-        goal.class_name = class_name
+        goal.target_id = target_id
         goal.timeout_s = float(timeout_s)
         goal.confirm_frames = int(confirm_frames)
         goal.require_depth = bool(require_depth)
 
         self.get_logger().info(
-            f"Sending goal: class='{class_name}', timeout={timeout_s}s, "
+            f"Sending goal: target_id='{target_id}' (class='{class_name}'), timeout={timeout_s}s, "
             f"confirm_frames={confirm_frames}, require_depth={require_depth}"
         )
 
@@ -82,7 +83,18 @@ class DetectClosestClient(Node):
         except Exception:
             pass
 
+    @staticmethod
+    def extract_class_from_target_id(target_id: str) -> str:
+        parts = target_id.split(':')
+        if len(parts) != 3:
+            raise ValueError("target_id must follow '<prefix>:<class>:<suffix>'")
+        stripped = [part.strip() for part in parts]
+        if any(len(part) == 0 for part in stripped):
+            raise ValueError("target_id segments must be non-empty")
+        return stripped[1]
+
     def log_run(self, log_file: str, *,
+                target_id: str,
                 class_name: str,
                 success: bool,
                 reason: str,
@@ -95,6 +107,7 @@ class DetectClosestClient(Node):
         record = {
             'client_ts': float(time.time()),
             'action_name': '/damaged_object_tracker_server/detect_closest',
+            'target_id': target_id,
             'class_name': class_name,
             'success': bool(success),
             'reason': str(reason) if reason is not None else '',
@@ -103,7 +116,7 @@ class DetectClosestClient(Node):
         if result is not None:
             try:
                 record.update({
-                    'saved_id': int(result.saved_id),
+                    'saved_id': str(result.saved_id),
                     'bbox': [int(result.bbox_x1), int(result.bbox_y1), int(result.bbox_x2), int(result.bbox_y2)],
                     'world': [float(result.world_x), float(result.world_y), float(result.world_z)],
                     'image_file': str(result.image_file),
@@ -122,7 +135,8 @@ class DetectClosestClient(Node):
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(description='DetectClosest action client')
-    parser.add_argument('--class', dest='class_name', required=True, help='Target class name (e.g., crack)')
+    parser.add_argument('--target-id', dest='target_id', required=True,
+                        help="Target identifier in the form '<prefix>:<class>:<suffix>' (e.g., 1:light_on:1)")
     parser.add_argument('--timeout', type=float, default=20.0, help='Timeout seconds (default: 20)')
     parser.add_argument('--confirm', type=int, default=1, help='Confirm frames (default: 1)')
     parser.add_argument('--require-depth', action='store_true', help='Require depth measurement')
@@ -139,13 +153,33 @@ def main(argv=None):
 
     node = DetectClosestClient()
     try:
+        try:
+            class_name = node.extract_class_from_target_id(args.target_id)
+        except ValueError as exc:
+            node.get_logger().error(f"Invalid target_id '{args.target_id}': {exc}")
+            node.log_run(
+                args.log_file,
+                target_id=args.target_id,
+                class_name='',
+                success=False,
+                reason='invalid_target_id',
+                result=None,
+                params={
+                    'timeout_s': float(args.timeout),
+                    'confirm_frames': int(args.confirm),
+                    'require_depth': bool(args.require_depth),
+                },
+            )
+            return 1
+
         node.get_logger().info('Waiting for DetectClosest action server...')
         if not node.wait_for_server(timeout_sec=10.0):
             node.get_logger().error('Server not available')
             # Log rejected-equivalent outcome (no server)
             node.log_run(
                 args.log_file,
-                class_name=args.class_name,
+                target_id=args.target_id,
+                class_name=class_name,
                 success=False,
                 reason='server_unavailable',
                 result=None,
@@ -166,7 +200,7 @@ def main(argv=None):
             timer = node.create_timer(float(args.cancel_after), _cancel)
 
         result_tuple = node.send_goal(
-            class_name=args.class_name,
+            target_id=args.target_id,
             timeout_s=args.timeout,
             confirm_frames=args.confirm,
             require_depth=args.require_depth,
@@ -175,7 +209,8 @@ def main(argv=None):
             # Goal was rejected
             node.log_run(
                 args.log_file,
-                class_name=args.class_name,
+                target_id=args.target_id,
+                class_name=class_name,
                 success=False,
                 reason='rejected',
                 result=None,
@@ -188,7 +223,7 @@ def main(argv=None):
             return 2
         status, result = result_tuple
         node.get_logger().info(
-            f"Result: success={result.success} reason='{result.reason}' id={result.saved_id} "
+            f"Result: success={result.success} reason='{result.reason}' id='{result.saved_id}' "
             f"bbox=({result.bbox_x1},{result.bbox_y1},{result.bbox_x2},{result.bbox_y2}) "
             f"world=({result.world_x:.2f},{result.world_y:.2f},{result.world_z:.2f}) "
             f"image='{result.image_file}' ts={result.timestamp:.3f} status={status}"
@@ -196,7 +231,8 @@ def main(argv=None):
         # Log success/timeout/canceled outcomes
         node.log_run(
             args.log_file,
-            class_name=args.class_name,
+            target_id=args.target_id,
+            class_name=class_name,
             success=bool(result.success),
             reason=str(result.reason),
             result=result,
