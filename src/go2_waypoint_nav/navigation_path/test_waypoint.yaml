@@ -5,11 +5,53 @@ waypoints:
     object:
       object_id: 1:light_on:1
     orientation:
-      w: 0.9766022602988735
+      w: 0.9994056024694754
       x: 0.0
       y: 0.0
-      z: -0.21505354026179457
+      z: -0.034473783555405806
     position:
-      x: 5.558703899383545
-      y: 2.4341938495635986
+      x: 1.8365756273269653
+      y: 2.7349605560302734
+      z: 0.3659999966621399
+- header:
+    frame_id: map
+  pose:
+    object:
+      object_id: 2:light_on:1
+    orientation:
+      w: 0.6901324053296939
+      x: 0.0
+      y: 0.0
+      z: -0.7236831234137294
+    position:
+      x: 1.7577540874481201
+      y: 0.6455122828483582
+      z: 0.3659999966621399
+- header:
+    frame_id: map
+  pose:
+    object:
+      object_id: 1:fire_extinguisher:1
+    orientation:
+      w: 0.9999477519680854
+      x: 0.0
+      y: 0.0
+      z: -0.010222198098862214
+    position:
+      x: 5.466570854187012
+      y: 2.1806206703186035
+      z: 0.3659999966621399
+- header:
+    frame_id: map
+  pose:
+    object:
+      object_id: 3:crack:1
+    orientation:
+      w: 0.6850277217170604
+      x: 0.0
+      y: 0.0
+      z: 0.7285170008168195
+    position:
+      x: 14.039752960205078
+      y: 5.990877151489258
       z: 0.3659999966621399
