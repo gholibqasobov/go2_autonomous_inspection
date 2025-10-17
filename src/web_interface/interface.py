@@ -22,19 +22,40 @@ def run():
 
     print("Selected points:", selected_points)
 
-    # Convert all point IDs to strings for command
+    # Convert all point IDs to strings for input
     obj_ids = [str(i['pose']['object']['object_id']) for i in selected_points]
 
-    # Build the ROS2 command
-    cmd = ["ros2", "run", "go2_waypoint_nav", "inspection_client_main"] + obj_ids
+    # Build the ROS2 command without arguments
+    cmd = ["ros2", "run", "go2_waypoint_nav", "inspection_client_main"]
     print("Running command:", " ".join(cmd))
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        print("ROS2 output:\n", result.stdout)
-        print("ROS2 errors:\n", result.stderr)
-    except subprocess.CalledProcessError as e:
-        print("ROS2 command failed:", e.stderr)
+        # Start the process with stdin pipe for interactive input
+        process = subprocess.Popen(
+            cmd, 
+            stdin=subprocess.PIPE, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE, 
+            text=True
+        )
+        
+        # Send each object ID as input to the running process
+        input_data = " ".join(obj_ids)
+        print("Sending input data:", repr(input_data))
+        
+        # Communicate with the process (send input and wait for completion)
+        stdout, stderr = process.communicate(input=input_data)
+        
+        print("ROS2 output:\n", stdout)
+        if stderr:
+            print("ROS2 errors:\n", stderr)
+            
+        # Check if process completed successfully
+        if process.returncode != 0:
+            print(f"ROS2 command failed with return code: {process.returncode}")
+            
+    except Exception as e:
+        print("Error running ROS2 command:", str(e))
     
     data = {"obj_ids": obj_ids}
     print('data:     ', data)
