@@ -1,0 +1,63 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+type: software
+title: "Software accompanying the quadruped elevator interaction study"
+version: "1.0.0"
+license: Apache-2.0
+repository-code: "https://github.com/gholibqasobov/go2_autonomous_inspection"
+abstract: >-
+  ROS 2 Humble software used in the real-world experiments of the study
+  "Autonomous Elevator Interaction and Multi-Floor Navigation for Quadruped
+  Robots Using Vision and Fiducial-Guided Manipulation". It runs the
+  elevator task on a Unitree Go2 Edu quadruped carrying a RoArm-M2-S
+  manipulator and an Intel RealSense D435 camera: AprilTag-based docking at
+  the lobby and in-cabin panels, fiducial-guided button pressing with
+  panel geometry measured offline, cabin entry, floor selection, and
+  elevator exit. The source code is identical to commit
+  358d90c750cbb3dd9732ec7f98b26e73ab07b1ec, the version used for the five
+  reported elevator trials; this release only adds documentation, the
+  license file and citation metadata.
+keywords:
+  - quadruped robot
+  - elevator interaction
+  - multi-floor navigation
+  - fiducial markers
+  - mobile manipulation
+  - ROS 2
+authors:
+  - family-names: Tolengutov
+    given-names: Rassul
+    affiliation: "School of IT and Engineering, Kazakh-British Technical University, Almaty, Kazakhstan"
+  - family-names: Qasobov
+    given-names: Gholibjon
+    affiliation: "School of IT and Engineering, Kazakh-British Technical University, Almaty, Kazakhstan"
+  - family-names: Ilyas
+    given-names: Muhammad
+    affiliation: "School of IT and Engineering, Kazakh-British Technical University, Almaty, Kazakhstan"
+  - family-names: Khan
+    given-names: Gulam Dastagir
+    affiliation: "College of Engineering, Sultan Qaboos University, Muscat, Oman"
+  - family-names: Waris
+    given-names: Muhammed Bilal
+    affiliation: "College of Engineering, Sultan Qaboos University, Muscat, Oman"
+references:
+  - type: software
+    title: "autonomy_stack_go2"
+    authors:
+      - name: "jizhang-cmu"
+    repository-code: "https://github.com/jizhang-cmu/autonomy_stack_go2"
+    notes: >-
+      Required dependency: provides unitree_api and go2_sport_api (robot
+      locomotion interface), SLAM and navigation for the Unitree Go2.
+  - type: software
+    title: "roarm_ws_em0"
+    authors:
+      - name: "Waveshare Electronics"
+    repository-code: "https://github.com/waveshareteam/roarm_ws_em0"
+    notes: "Required dependency: RoArm-M2-S driver and MoveIt 2 point-command service."
+  - type: software
+    title: "apriltag_ros"
+    authors:
+      - name: "Christian Rauch"
+    repository-code: "https://github.com/christianrauch/apriltag_ros"
+    notes: "AprilTag (tag36h11) detection and pose estimation."
